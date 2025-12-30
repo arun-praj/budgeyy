@@ -15,6 +15,7 @@ interface TransactionsPageProps {
     searchParams: Promise<{
         type?: string;
         categoryId?: string;
+        range?: string;
     }>;
 }
 
@@ -72,10 +73,37 @@ async function TransactionsContent({ searchParams }: { searchParams: Promise<{ [
         ? type as TransactionType
         : undefined;
 
+    const range = typeof params.range === 'string' ? params.range : 'this-month';
+
+    // Calculate Date Range
+    const today = new Date();
+    let start: Date | undefined;
+    let end: Date | undefined;
+
+    if (range === 'this-month') {
+        start = new Date(today.getFullYear(), today.getMonth(), 1);
+        end = new Date(today.getFullYear(), today.getMonth() + 1, 0, 23, 59, 59, 999);
+    } else {
+        end = new Date(today);
+        end.setHours(23, 59, 59, 999);
+        start = new Date(today);
+        start.setHours(0, 0, 0, 0);
+
+        if (range === '3m') {
+            start.setMonth(start.getMonth() - 3);
+        } else if (range === '6m') {
+            start.setMonth(start.getMonth() - 6);
+        } else if (range === '1y') {
+            start.setFullYear(start.getFullYear() - 1);
+        }
+    }
+
     const [transactions, userSettings, categories] = await Promise.all([
         getTransactions({
             categoryId: categoryId === 'all' ? undefined : categoryId,
-            type: validType
+            type: validType,
+            start,
+            end
         }),
         getUserSettings(),
         getCategories(),
