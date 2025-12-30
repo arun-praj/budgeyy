@@ -12,6 +12,8 @@ import {
     Calendar,
     Receipt,
     Tags,
+    Upload,
+    User,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -24,7 +26,7 @@ const navItems = [
     { href: '/calendar', label: 'Calendar', icon: Calendar },
     { href: '/categories', label: 'Categories', icon: Tags },
     { href: '/budgets', label: 'Budgets', icon: PiggyBank },
-    { href: '/settings', label: 'Settings', icon: Settings },
+    { href: '/settings', label: 'Profile', icon: User },
 ];
 
 export function Sidebar() {

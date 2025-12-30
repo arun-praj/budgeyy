@@ -1,10 +1,11 @@
 import { DeletedTransactionsList } from '@/components/settings/deleted-transactions-list';
 import { SettingsForm } from '@/components/settings/settings-form';
+import { AccountForm } from '@/components/settings/account-form';
 import { getUserSettings } from '@/actions/user';
 import { getDeletedTransactions } from '@/actions/transactions';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
-import { Tags, PiggyBank, Trash2 } from 'lucide-react';
+import { Tags, PiggyBank, Trash2, User, Settings as SettingsIcon } from 'lucide-react';
 import {
     Card,
     CardContent,
@@ -32,11 +33,11 @@ export default async function SettingsPage() {
     return (
         <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
             <div className="flex items-center justify-between space-y-2">
-                <h2 className="text-3xl font-bold tracking-tight">Settings</h2>
+                <h2 className="text-3xl font-bold tracking-tight">Profile</h2>
             </div>
 
-            <div className="grid gap-6">
-                {/* Mobile Management Links */}
+            <div className="space-y-4">
+                {/* Mobile Management Links - Keeping these for easy access */}
                 <div className="grid gap-4 grid-cols-2 md:hidden">
                     <Link href="/categories" className="flex flex-col items-center justify-center p-4 rounded-xl border bg-card text-card-foreground shadow-sm hover:bg-accent/50 transition-colors">
                         <Tags className="h-6 w-6 mb-2 text-primary" />
@@ -48,44 +49,53 @@ export default async function SettingsPage() {
                     </Link>
                 </div>
 
-                <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-                    <div className="col-span-full md:col-span-2">
-                        <Tabs defaultValue="general" className="w-full">
-                            <TabsList className="grid w-full grid-cols-2 lg:w-[400px]">
-                                <TabsTrigger value="general">General</TabsTrigger>
-                                <TabsTrigger value="deleted">Deleted Items</TabsTrigger>
-                            </TabsList>
-                            <TabsContent value="general">
-                                <SettingsForm
-                                    defaultValues={{
-                                        currency: user.currency || 'USD',
-                                        calendarPreference: user.calendarPreference || 'gregorian',
-                                        theme: user.theme as 'light' | 'dark' | 'system' || 'system',
-                                    }}
+                <Tabs defaultValue="account" className="space-y-4">
+                    <TabsList className="grid w-full grid-cols-3 lg:w-[400px]">
+                        <TabsTrigger value="account">Account</TabsTrigger>
+                        <TabsTrigger value="general">General</TabsTrigger>
+                        <TabsTrigger value="deleted">Deleted</TabsTrigger>
+                    </TabsList>
+
+                    <TabsContent value="account" className="space-y-4">
+                        <AccountForm
+                            defaultValues={{
+                                fullName: user.fullName || '',
+                                email: user.email || '',
+                                avatar: user.avatar || undefined,
+                            }}
+                        />
+                    </TabsContent>
+
+                    <TabsContent value="general" className="space-y-4">
+                        <SettingsForm
+                            defaultValues={{
+                                currency: user.currency || 'USD',
+                                calendarPreference: user.calendarPreference || 'gregorian',
+                                theme: user.theme as 'light' | 'dark' | 'system' || 'system',
+                            }}
+                        />
+                    </TabsContent>
+
+                    <TabsContent value="deleted" className="space-y-4">
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2">
+                                    <Trash2 className="h-5 w-5" />
+                                    Deleted Transactions
+                                </CardTitle>
+                                <CardDescription>
+                                    Transactions deleted in the last 30 days. You can restore them or delete them permanently.
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <DeletedTransactionsList
+                                    initialData={deletedTransactions}
+                                    currency={user.currency || 'USD'}
                                 />
-                            </TabsContent>
-                            <TabsContent value="deleted">
-                                <Card>
-                                    <CardHeader>
-                                        <CardTitle className="flex items-center gap-2">
-                                            <Trash2 className="h-5 w-5" />
-                                            Deleted Transactions
-                                        </CardTitle>
-                                        <CardDescription>
-                                            Transactions deleted in the last 30 days. You can restore them or delete them permanently.
-                                        </CardDescription>
-                                    </CardHeader>
-                                    <CardContent>
-                                        <DeletedTransactionsList
-                                            initialData={deletedTransactions}
-                                            currency={user.currency || 'USD'}
-                                        />
-                                    </CardContent>
-                                </Card>
-                            </TabsContent>
-                        </Tabs>
-                    </div>
-                </div>
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
+                </Tabs>
             </div>
         </div>
     );

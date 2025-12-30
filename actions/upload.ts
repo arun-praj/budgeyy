@@ -4,6 +4,8 @@ import { r2 } from '@/lib/r2';
 import { PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { randomUUID } from 'crypto';
 
+import sharp from 'sharp';
+
 export async function uploadFile(formData: FormData) {
     if (!process.env.R2_BUCKET_NAME) {
         return { error: 'R2_BUCKET_NAME is not defined' };
@@ -14,19 +16,23 @@ export async function uploadFile(formData: FormData) {
         return { error: 'No file provided' };
     }
 
-    const fileType = file.type;
     const fileId = randomUUID();
-    const extension = fileType.split('/')[1];
-    const fileName = `${fileId}.${extension}`;
+    const fileName = `${fileId}.webp`;
 
     try {
         const buffer = Buffer.from(await file.arrayBuffer());
 
+        // Compress image: Resize to max 1200px width, convert to WebP, quality 80
+        const compressedBuffer = await sharp(buffer)
+            .resize({ width: 1200, withoutEnlargement: true })
+            .toFormat('webp', { quality: 80 })
+            .toBuffer();
+
         const putCommand = new PutObjectCommand({
             Bucket: process.env.R2_BUCKET_NAME,
             Key: fileName,
-            Body: buffer,
-            ContentType: fileType,
+            Body: compressedBuffer,
+            ContentType: 'image/webp',
         });
 
         await r2.send(putCommand);

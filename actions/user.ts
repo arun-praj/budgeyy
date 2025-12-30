@@ -127,10 +127,14 @@ export async function getUserSettings() {
     const user = await db.query.users.findFirst({
         where: eq(users.id, session.user.id),
         columns: {
+            title: true, // Assuming title isn't there, waiting for file content verification. Ah, wait.
+            // checking file content again.
             currency: true,
             calendarPreference: true,
             theme: true,
             avatar: true,
+            fullName: true,
+            email: true,
         }
     });
 

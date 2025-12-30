@@ -124,6 +124,7 @@ export async function getTransactions(options: {
         where: and(...conditions),
         with: {
             category: true,
+            user: true,
         },
         orderBy: [desc(transactions.date)],
         limit: options.limit || 50,
