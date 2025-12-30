@@ -27,14 +27,44 @@ export function ImageUpload({
     const handleUpload = async (file: File) => {
         if (!file) return;
 
-        // Validate type (image only)
-        if (!file.type.startsWith('image/')) {
+        let uploadFileObj = file;
+
+        // HEIC conversion
+        if (file.type === 'image/heic' || file.type === 'image/heif' || file.name.toLowerCase().endsWith('.heic')) {
+            try {
+                toast.info('Converting HEIC image...');
+                // Dynamically import heic2any to avoid SSR issues if any
+                const heic2any = (await import('heic2any')).default;
+
+                const convertedBlob = await heic2any({
+                    blob: file,
+                    toType: 'image/webp',
+                    quality: 0.8
+                });
+
+                // heic2any can return a blob or array of blobs. We expect a single blob for single file.
+                const blob = Array.isArray(convertedBlob) ? convertedBlob[0] : convertedBlob;
+
+                uploadFileObj = new File(
+                    [blob],
+                    file.name.replace(/\.(heic|heif)$/i, '.webp'),
+                    { type: 'image/webp' }
+                );
+            } catch (error) {
+                console.error('HEIC conversion failed:', error);
+                toast.error('Failed to convert HEIC image');
+                return;
+            }
+        }
+
+        // Validate type (image only) - check uploadFileObj now
+        if (!uploadFileObj.type.startsWith('image/')) {
             toast.error('Please upload an image file');
             return;
         }
 
         // Validate size (e.g., 5MB)
-        if (file.size > 5 * 1024 * 1024) {
+        if (uploadFileObj.size > 5 * 1024 * 1024) {
             toast.error('Image must be less than 5MB');
             return;
         }
@@ -42,7 +72,7 @@ export function ImageUpload({
         setIsUploading(true);
         try {
             const formData = new FormData();
-            formData.append('file', file);
+            formData.append('file', uploadFileObj);
 
             const result = await uploadFile(formData);
 
