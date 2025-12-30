@@ -1,5 +1,7 @@
 'use client';
 
+import type { CalendarPreference } from '@/types';
+
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
@@ -75,7 +77,6 @@ const necessityOptions = [
     { value: 'wants', label: 'Wants', color: 'bg-purple-500', description: 'Discretionary spending (Dining, Entertainment)' },
 ] as const;
 
-import type { CalendarPreference } from '@/types';
 
 interface TransactionFormSheetProps {
     transaction?: TransactionWithCategory | null;
