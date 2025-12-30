@@ -14,9 +14,11 @@ const NotionAvatar = dynamic(() => import('react-notion-avatar').then(mod => mod
     loading: () => <User className="h-6 w-6" />
 });
 
+import type { CalendarPreference } from '@/types';
+
 interface BottomNavProps {
     avatarConfig?: string | null;
-    calendar?: string;
+    calendar?: CalendarPreference | string | null;
 }
 
 export function BottomNav({ avatarConfig, calendar }: BottomNavProps) {

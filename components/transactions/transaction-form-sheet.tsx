@@ -75,11 +75,13 @@ const necessityOptions = [
     { value: 'wants', label: 'Wants', color: 'bg-purple-500', description: 'Discretionary spending (Dining, Entertainment)' },
 ] as const;
 
+import type { CalendarPreference } from '@/types';
+
 interface TransactionFormSheetProps {
     transaction?: TransactionWithCategory | null;
     open?: boolean;
     onOpenChange?: (open: boolean) => void;
-    calendar?: string;
+    calendar?: CalendarPreference | string | null;
     trigger?: React.ReactNode;
 }
 
