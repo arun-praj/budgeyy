@@ -101,6 +101,9 @@ export function TransactionFormSheet({
     const open = isControlled ? controlledOpen : internalOpen;
     const setOpen = isControlled ? setControlledOpen! : setInternalOpen;
 
+    // Force Gregorian calendar for transaction form as per user request
+    const formCalendar = 'gregorian';
+
     const form = useForm<TransactionFormValues>({
         resolver: zodResolver(transactionSchema) as any,
         defaultValues: {
@@ -268,7 +271,7 @@ export function TransactionFormSheet({
                                     <FormLabel>Date</FormLabel>
                                     <FormControl>
                                         <div className="relative">
-                                            {calendar === 'nepali' ? (
+                                            {formCalendar === 'nepali' ? (
                                                 <NepaliDatePicker
                                                     value={field.value ? new Date(field.value) : undefined}
                                                     onChange={(date) => {
