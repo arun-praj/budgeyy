@@ -101,8 +101,9 @@ export function TransactionFormSheet({
     const open = isControlled ? controlledOpen : internalOpen;
     const setOpen = isControlled ? setControlledOpen! : setInternalOpen;
 
-    // Force Gregorian calendar for transaction form as per user request
-    const formCalendar = 'gregorian';
+
+    // Force Gregorian calendar for adding text, respect preference for editing ("All other remains same")
+    const formCalendar = transaction ? calendar : 'gregorian';
 
     const form = useForm<TransactionFormValues>({
         resolver: zodResolver(transactionSchema) as any,
