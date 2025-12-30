@@ -22,13 +22,13 @@ export const metadata: Metadata = {
 import { ThemeSyncer } from "@/components/providers/theme-syncer";
 import { getUserSettings } from "@/actions/user";
 
-export default async function RootLayout({
+import { Suspense } from "react";
+
+export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const userSettings = await getUserSettings();
-
   return (
     <html lang="en" suppressHydrationWarning>
       <body
@@ -40,10 +40,17 @@ export default async function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <ThemeSyncer theme={userSettings?.theme} />
+          <Suspense fallback={null}>
+            <ConnectedThemeSyncer />
+          </Suspense>
           {children}
         </ThemeProvider>
       </body>
     </html>
   );
+}
+
+async function ConnectedThemeSyncer() {
+  const userSettings = await getUserSettings();
+  return <ThemeSyncer theme={userSettings?.theme} />;
 }

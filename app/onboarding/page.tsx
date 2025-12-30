@@ -9,7 +9,21 @@ export const metadata = {
     description: 'Complete your profile setup',
 };
 
-export default async function OnboardingPage() {
+import { Suspense } from 'react';
+import { Loader2 } from 'lucide-react';
+
+export default function OnboardingPage() {
+    return (
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-muted/50 p-4">
+            <Suspense fallback={<Loader2 className="h-8 w-8 animate-spin text-primary" />}>
+                <OnboardingContent />
+            </Suspense>
+            <Toaster />
+        </div>
+    );
+}
+
+async function OnboardingContent() {
     // Check if user is authenticated
     const session = await auth.api.getSession({
         headers: await headers(),
@@ -26,10 +40,5 @@ export default async function OnboardingPage() {
         redirect('/dashboard');
     }
 
-    return (
-        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-muted/50 p-4">
-            <OnboardingWizard />
-            <Toaster />
-        </div>
-    );
+    return <OnboardingWizard />;
 }

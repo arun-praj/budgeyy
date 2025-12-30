@@ -8,13 +8,13 @@ export const metadata = {
     description: 'Manage your finances with the 50/30/20 rule',
 };
 
-export default async function DashboardLayout({
+import { Suspense } from 'react';
+
+export default function DashboardLayout({
     children,
 }: {
     children: React.ReactNode;
 }) {
-    const userSettings = await getUserSettings();
-
     return (
         <div className="flex min-h-screen bg-background">
             <Sidebar />
@@ -23,8 +23,15 @@ export default async function DashboardLayout({
                     {children}
                 </div>
             </main>
-            <BottomNav avatarConfig={userSettings?.avatar} calendar={userSettings?.calendarPreference} />
+            <Suspense fallback={null}>
+                <ConnectedBottomNav />
+            </Suspense>
             <Toaster />
         </div>
     );
+}
+
+async function ConnectedBottomNav() {
+    const userSettings = await getUserSettings();
+    return <BottomNav avatarConfig={userSettings?.avatar} calendar={userSettings?.calendarPreference} />;
 }

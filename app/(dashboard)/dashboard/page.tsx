@@ -15,25 +15,101 @@ import { getMonthRange, formatDate, formatPeriodLabel } from '@/lib/date-utils';
 import { formatCurrency } from '@/lib/utils';
 import { Suspense } from 'react';
 
-export const dynamic = 'force-dynamic';
 
-export default async function DashboardPage({
-    searchParams,
-}: {
+export default function DashboardPage(props: {
     searchParams: Promise<{ [key: string]: string | string[] | undefined }>
 }) {
+    return (
+        <div className="space-y-6">
+            {/* Header */}
+            <Suspense fallback={<DashboardHeaderSkeleton />}>
+                <DashboardHeader searchParams={props.searchParams} />
+            </Suspense>
+
+            {/* Stats Grid */}
+            <Suspense fallback={<StatsGridSkeleton />}>
+                <DashboardContent searchParams={props.searchParams} />
+            </Suspense>
+        </div>
+    );
+}
+
+function DashboardHeaderSkeleton() {
+    return (
+        <div className="flex flex-col gap-4">
+            <div className="h-10 w-full md:w-1/3 bg-muted animate-pulse rounded-md" />
+        </div>
+    );
+}
+
+function StatsGridSkeleton() {
+    return (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {[...Array(4)].map((_, i) => (
+                <div key={i} className="h-32 bg-muted animate-pulse rounded-xl" />
+            ))}
+        </div>
+    );
+}
+
+async function DashboardHeader({ searchParams }: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }) {
     const params = await searchParams;
     const dateParam = params.date as string;
-    // Default to current date if no param
     const currentDate = dateParam ? new Date(dateParam) : new Date();
+
+    // We need user settings for calendar pref to format date in header? 
+    // Yes: formatDate(..., calendar).
+    // So Header needs async data too.
+    const userSettings = await getUserSettings();
+    const calendar = userSettings?.calendarPreference || 'gregorian';
+    const currency = userSettings?.currency || 'USD';
+
+    const formattedMonth = formatPeriodLabel(currentDate, calendar);
+    const today = formatDate(new Date(), calendar, 'long');
+
+    // Report data for download button
+    const { start, end } = getMonthRange(currentDate);
+    // Optimization: Parallel fetch report data with user settings?
+    // Let's just fetch report data here or pass it?
+    // DownloadButton needs report data.
+    const reportData = await getBudgetReportData(start, end);
+    if (reportData) {
+        (reportData as any).monthLabel = formattedMonth;
+    }
+
+    return (
+        <div className="flex flex-col gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                    <h1 className="text-3xl font-bold">Dashboard</h1>
+                    <div className="flex flex-col gap-1 text-muted-foreground">
+                        <p>Overview for {formattedMonth}</p>
+                        <p className="text-sm font-medium text-foreground/80">Today is {today}</p>
+                    </div>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                    <DownloadBudgetButton data={reportData} currency={currency} />
+                    <DashboardFilters calendar={calendar} />
+                    <div className="hidden sm:block">
+                        <TransactionFormSheet calendar={calendar} />
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+async function DashboardContent({ searchParams }: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }) {
+    const params = await searchParams;
+    const dateParam = params.date as string;
+    const currentDate = dateParam ? new Date(dateParam) : new Date(); // Re-parsing is cheap/fine
 
     const { start, end } = getMonthRange(currentDate);
 
     // Run fetches in parallel
-    const [stats, recentTransactions, reportData, userSettings, dailyStats] = await Promise.all([
+    const [stats, recentTransactions, userSettings, dailyStats] = await Promise.all([
         getDashboardStats({ start, end }),
         getTransactions({ limit: 5, start, end }),
-        getBudgetReportData(start, end),
         getUserSettings(),
         getCalendarStats(start, end),
     ]);
@@ -44,39 +120,11 @@ export default async function DashboardPage({
     const netSavings = stats.savingsAmount;
     // Balance = Income - Expenses - Savings (Remaining spendable)
     const balance = stats.totalIncome - stats.totalExpenses - netSavings;
-
     const formattedMonth = formatPeriodLabel(currentDate, calendar);
-    const today = formatDate(new Date(), calendar, 'long');
 
-    // Enhance report data with label
-    if (reportData) {
-        (reportData as any).monthLabel = formattedMonth;
-    }
 
     return (
-        <div className="space-y-6">
-            {/* Header */}
-            <div className="flex flex-col gap-4">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                    <div>
-                        <h1 className="text-3xl font-bold">Dashboard</h1>
-                        <div className="flex flex-col gap-1 text-muted-foreground">
-                            <p>Overview for {formattedMonth}</p>
-                            <p className="text-sm font-medium text-foreground/80">Today is {today}</p>
-                        </div>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                        <DownloadBudgetButton data={reportData} currency={currency} />
-                        <DashboardFilters calendar={calendar} />
-                        <div className="hidden sm:block">
-                            <TransactionFormSheet calendar={calendar} />
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* Stats Grid */}
-            {/* Stats Grid */}
+        <>
             <div className="block sm:hidden">
                 <StackedStatCards
                     stats={[
@@ -196,6 +244,6 @@ export default async function DashboardPage({
 
             {/* Recent Transactions */}
             <RecentTransactions transactions={recentTransactions} currency={currency} calendar={calendar} />
-        </div>
+        </>
     );
 }

@@ -20,16 +20,10 @@ import {
     TabsTrigger,
 } from "@/components/ui/tabs";
 
-export default async function SettingsPage() {
-    const [user, deletedTransactions] = await Promise.all([
-        getUserSettings(),
-        getDeletedTransactions()
-    ]);
+import { Suspense } from 'react';
+import { Loader2 } from 'lucide-react';
 
-    if (!user) {
-        redirect('/login');
-    }
-
+export default function SettingsPage() {
     return (
         <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
             <div className="flex items-center justify-between space-y-2">
@@ -49,54 +43,71 @@ export default async function SettingsPage() {
                     </Link>
                 </div>
 
-                <Tabs defaultValue="account" className="space-y-4">
-                    <TabsList className="grid w-full grid-cols-3 lg:w-[400px]">
-                        <TabsTrigger value="account">Account</TabsTrigger>
-                        <TabsTrigger value="general">General</TabsTrigger>
-                        <TabsTrigger value="deleted">Deleted</TabsTrigger>
-                    </TabsList>
-
-                    <TabsContent value="account" className="space-y-4">
-                        <AccountForm
-                            defaultValues={{
-                                fullName: user.fullName || '',
-                                email: user.email || '',
-                                avatar: user.avatar || undefined,
-                            }}
-                        />
-                    </TabsContent>
-
-                    <TabsContent value="general" className="space-y-4">
-                        <SettingsForm
-                            defaultValues={{
-                                currency: user.currency || 'USD',
-                                calendarPreference: user.calendarPreference || 'gregorian',
-                                theme: user.theme as 'light' | 'dark' | 'system' || 'system',
-                            }}
-                        />
-                    </TabsContent>
-
-                    <TabsContent value="deleted" className="space-y-4">
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="flex items-center gap-2">
-                                    <Trash2 className="h-5 w-5" />
-                                    Deleted Transactions
-                                </CardTitle>
-                                <CardDescription>
-                                    Transactions deleted in the last 30 days. You can restore them or delete them permanently.
-                                </CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                <DeletedTransactionsList
-                                    initialData={deletedTransactions}
-                                    currency={user.currency || 'USD'}
-                                />
-                            </CardContent>
-                        </Card>
-                    </TabsContent>
-                </Tabs>
+                <Suspense fallback={<div className="flex justify-center p-8"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>}>
+                    <SettingsContent />
+                </Suspense>
             </div>
         </div>
+    );
+}
+
+async function SettingsContent() {
+    const [user, deletedTransactions] = await Promise.all([
+        getUserSettings(),
+        getDeletedTransactions()
+    ]);
+
+    if (!user) {
+        redirect('/login');
+    }
+
+    return (
+        <Tabs defaultValue="account" className="space-y-4">
+            <TabsList className="grid w-full grid-cols-3 lg:w-[400px]">
+                <TabsTrigger value="account">Account</TabsTrigger>
+                <TabsTrigger value="general">General</TabsTrigger>
+                <TabsTrigger value="deleted">Deleted</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="account" className="space-y-4">
+                <AccountForm
+                    defaultValues={{
+                        fullName: user.fullName || '',
+                        email: user.email || '',
+                        avatar: user.avatar || undefined,
+                    }}
+                />
+            </TabsContent>
+
+            <TabsContent value="general" className="space-y-4">
+                <SettingsForm
+                    defaultValues={{
+                        currency: user.currency || 'USD',
+                        calendarPreference: user.calendarPreference || 'gregorian',
+                        theme: user.theme as 'light' | 'dark' | 'system' || 'system',
+                    }}
+                />
+            </TabsContent>
+
+            <TabsContent value="deleted" className="space-y-4">
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                            <Trash2 className="h-5 w-5" />
+                            Deleted Transactions
+                        </CardTitle>
+                        <CardDescription>
+                            Transactions deleted in the last 30 days. You can restore them or delete them permanently.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <DeletedTransactionsList
+                            initialData={deletedTransactions}
+                            currency={user.currency || 'USD'}
+                        />
+                    </CardContent>
+                </Card>
+            </TabsContent>
+        </Tabs>
     );
 }
