@@ -415,8 +415,6 @@ export async function getBudgetReportData(start: Date, end: Date) {
     const rangeTransactions = await db.query.transactions.findMany({
         where: and(
             eq(transactions.userId, session.user.id),
-            gte(transactions.date, start),
-            eq(transactions.userId, session.user.id),
             eq(transactions.isDeleted, false),
             gte(transactions.date, start),
             lte(transactions.date, end)
@@ -426,56 +424,62 @@ export async function getBudgetReportData(start: Date, end: Date) {
         }
     });
 
-    const data = {
-        income: [] as any[],
-        needs: [] as any[],
-        wants: [] as any[],
-        savings: [] as any[],
-        totals: {
-            totalIncome: 0,
-            totalNeeds: 0,
-            totalWants: 0,
-            totalSavings: 0,
-            expenses: 0,
-            balance: 0,
+    // Helper to aggregate by category
+    const aggregateByCategory = (txs: typeof rangeTransactions) => {
+        const map = new Map<string, number>();
+
+        for (const tx of txs) {
+            const categoryName = tx.category?.name || 'Uncategorized';
+            const amount = parseFloat(tx.amount);
+            map.set(categoryName, (map.get(categoryName) || 0) + amount);
         }
+
+        return Array.from(map.entries())
+            .map(([description, amount]) => ({
+                description,
+                amount,
+                // We don't really have a single date for aggregated items, 
+                // but the PDF might not strictly require it for the summary list.
+                // If it does, we can use the end date or null.
+                // Looking at budget-pdf.tsx, it uses description and amount.
+            }))
+            .sort((a, b) => b.amount - a.amount); // Sort by highest amount
     };
 
-    for (const tx of rangeTransactions) {
-        const amount = parseFloat(tx.amount);
-        const item = {
-            description: tx.description || tx.category?.name || 'Untitled',
-            amount: amount,
-            date: tx.date,
-        };
+    const incomeTxs = rangeTransactions.filter(t => t.type === 'income');
+    const savingsTxs = rangeTransactions.filter(t => t.type === 'savings');
+    // For expenses, split by necessity
+    const expenseTxs = rangeTransactions.filter(t => t.type !== 'income' && t.type !== 'savings');
+    const needsTxs = expenseTxs.filter(t => t.necessityLevel === 'needs');
+    const wantsTxs = expenseTxs.filter(t => t.necessityLevel === 'wants');
 
-        if (tx.type === 'income') {
-            data.income.push(item);
-            data.totals.totalIncome += amount;
-        } else if (tx.type === 'savings') {
-            data.savings.push(item);
-            data.totals.totalSavings += amount;
-        } else {
-            data.totals.expenses += amount;
-            if (tx.necessityLevel === 'needs') {
-                data.needs.push(item);
-                data.totals.totalNeeds += amount;
-            } else if (tx.necessityLevel === 'wants') {
-                data.wants.push(item);
-                data.totals.totalWants += amount;
-            }
-            // Legacy savings necessity check removed or ignored for new type consistency
+    // Calculate totals
+    const totalIncome = incomeTxs.reduce((sum, t) => sum + parseFloat(t.amount), 0);
+    const totalSavings = savingsTxs.reduce((sum, t) => sum + parseFloat(t.amount), 0);
+    const totalNeeds = needsTxs.reduce((sum, t) => sum + parseFloat(t.amount), 0);
+    const totalWants = wantsTxs.reduce((sum, t) => sum + parseFloat(t.amount), 0);
+    const expenses = totalNeeds + totalWants; // Or total expenses from all non-income/non-savings
+
+    // Aggregate lists
+    const income = aggregateByCategory(incomeTxs);
+    const savings = aggregateByCategory(savingsTxs);
+    const needs = aggregateByCategory(needsTxs);
+    const wants = aggregateByCategory(wantsTxs);
+
+    const data = {
+        income,
+        needs,
+        wants,
+        savings,
+        totals: {
+            totalIncome,
+            totalNeeds,
+            totalWants,
+            totalSavings,
+            expenses,
+            balance: totalIncome - expenses - totalSavings,
         }
-    }
-
-    // Implicit savings (Income - Expenses) if positive and no specific savings usage?
-    // Or just report explicit savings transactions.
-    // The sheet has "TOTAL SAVINGS" in bottom left.
-    // Let's rely on explicit 'savings' transactions for the list, 
-    // but the summary might want "Potential Savings" (Income - Expenses).
-    // For now, adhere to explicit data. 
-
-    data.totals.balance = data.totals.totalIncome - data.totals.expenses - data.totals.totalSavings;
+    };
 
     // Fetch daily stats for insights
     const dailyStats = await getCalendarStats(start, end);

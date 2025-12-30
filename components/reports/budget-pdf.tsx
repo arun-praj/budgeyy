@@ -111,6 +111,7 @@ const styles = StyleSheet.create({
 interface TransactionItem {
     description: string;
     amount: number;
+    date?: Date | string;
 }
 
 interface BudgetData {
