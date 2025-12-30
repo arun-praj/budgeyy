@@ -26,7 +26,7 @@ export function CalendarGrid({ date, data, currency = 'USD', calendar = 'gregori
     const [selectedDate, setSelectedDate] = useState<Date | null>(null);
 
     const calendarDays = useMemo(() => {
-        const { start, end } = getMonthRange(date);
+        const { start, end } = getMonthRange(date, calendar as any);
 
         // Find the start date of the first week (could be in previous month)
         const startDate = new Date(start);
@@ -46,7 +46,7 @@ export function CalendarGrid({ date, data, currency = 'USD', calendar = 'gregori
         }
 
         return days;
-    }, [date]);
+    }, [date, calendar]);
 
     // Map data for quick lookup
     const statsMap = useMemo(() => {
@@ -67,6 +67,11 @@ export function CalendarGrid({ date, data, currency = 'USD', calendar = 'gregori
     }, [data]);
 
     const isSameMonth = (d1: Date, d2: Date) => {
+        if (calendar === 'nepali') {
+            const nd1 = new NepaliDate(d1);
+            const nd2 = new NepaliDate(d2);
+            return nd1.getMonth() === nd2.getMonth() && nd1.getYear() === nd2.getYear();
+        }
         return d1.getMonth() === d2.getMonth() && d1.getFullYear() === d2.getFullYear();
     };
 
@@ -123,14 +128,21 @@ export function CalendarGrid({ date, data, currency = 'USD', calendar = 'gregori
                                 "sm:aspect-auto sm:min-h-[100px] sm:p-2 sm:border-b sm:border-r sm:last:border-r-0",
                                 // Hover only on desktop
                                 "sm:hover:bg-muted/50",
-                                !isCurrentMonth && "opacity-30 sm:opacity-100 sm:bg-muted/20 sm:text-muted-foreground",
+                                // Previous/Next month fading
+                                !isCurrentMonth && "opacity-40 bg-muted/10",
                                 // Current day highlight
-                                isCurrentDay && "bg-primary/5 sm:ring-1 sm:ring-inset sm:ring-primary font-bold"
+                                isCurrentDay && "bg-primary/5 sm:ring-1 sm:ring-inset sm:ring-primary"
                             )}
                         >
                             <span className={cn(
-                                "text-xs sm:text-sm font-medium w-6 h-6 sm:w-7 sm:h-7 flex items-center justify-center rounded-full sm:mb-1",
-                                isCurrentDay ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground"
+                                "text-xs sm:text-sm w-6 h-6 sm:w-7 sm:h-7 flex items-center justify-center rounded-full sm:mb-1",
+                                // User Request: "this month date should be bold and dark"
+                                isCurrentMonth ? "font-bold" : "font-normal",
+                                isCurrentDay
+                                    ? "bg-primary text-primary-foreground shadow-sm"
+                                    : isCurrentMonth
+                                        ? "text-foreground"
+                                        : "text-muted-foreground"
                             )}>
                                 {getDayLabel(day)}
                             </span>
