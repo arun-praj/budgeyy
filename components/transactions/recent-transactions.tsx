@@ -9,15 +9,12 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn, formatCurrency } from '@/lib/utils';
 import { formatDate } from '@/lib/date-utils';
-import type { Transaction, Category } from '@/db/schema';
+import type { TransactionWithUserAndCategory } from '@/types';
 import { TransactionFormSheet } from './transaction-form-sheet';
-
-interface TransactionWithCategory extends Transaction {
-    category: Category | null;
-}
+import { TransactionDetailsDialog } from './transaction-details-dialog';
 
 interface RecentTransactionsProps {
-    transactions: TransactionWithCategory[];
+    transactions: TransactionWithUserAndCategory[];
     currency?: string;
     calendar?: string;
 }
@@ -29,7 +26,8 @@ const necessityColors = {
 };
 
 export function RecentTransactions({ transactions, currency = 'USD', calendar = 'gregorian' }: RecentTransactionsProps) {
-    const [editingTransaction, setEditingTransaction] = useState<TransactionWithCategory | null>(null);
+    const [editingTransaction, setEditingTransaction] = useState<TransactionWithUserAndCategory | null>(null);
+    const [viewingTransaction, setViewingTransaction] = useState<TransactionWithUserAndCategory | null>(null);
 
     if (transactions.length === 0) {
         return (
@@ -73,7 +71,7 @@ export function RecentTransactions({ transactions, currency = 'USD', calendar = 
                                 initial={{ opacity: 0, x: -20 }}
                                 animate={{ opacity: 1, x: 0 }}
                                 transition={{ duration: 0.3, delay: index * 0.05 }}
-                                onClick={() => setEditingTransaction(transaction)}
+                                onClick={() => setViewingTransaction(transaction)}
                                 className="flex items-start gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
                             >
                                 <div
@@ -147,6 +145,18 @@ export function RecentTransactions({ transactions, currency = 'USD', calendar = 
                     </div>
                 </CardContent >
             </Card >
+
+            <TransactionDetailsDialog
+                transaction={viewingTransaction}
+                open={!!viewingTransaction}
+                onOpenChange={(open) => !open && setViewingTransaction(null)}
+                onEdit={(tx) => {
+                    setViewingTransaction(null);
+                    setEditingTransaction(tx);
+                }}
+                currency={currency}
+                calendar={calendar}
+            />
 
             <TransactionFormSheet
                 transaction={editingTransaction}

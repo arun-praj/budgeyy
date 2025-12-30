@@ -1,5 +1,12 @@
+import type { Transaction, Category, User } from '@/db/schema';
+
 // Transaction types
 export type TransactionType = 'income' | 'expense' | 'savings';
+
+export interface TransactionWithUserAndCategory extends Transaction {
+    category: Category | null;
+    user: User | null;
+}
 export type NecessityLevel = 'needs' | 'wants' | 'savings';
 
 // Calendar preference

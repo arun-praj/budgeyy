@@ -37,15 +37,12 @@ import { formatDate } from '@/lib/date-utils';
 import { deleteTransaction } from '@/actions/transactions';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
-import type { Transaction, Category } from '@/db/schema';
+import type { TransactionWithUserAndCategory } from '@/types';
+import { TransactionDetailsDialog } from './transaction-details-dialog';
 import { TransactionFormSheet } from './transaction-form-sheet';
 
-interface TransactionWithCategory extends Transaction {
-    category: Category | null;
-}
-
 interface TransactionsListProps {
-    transactions: TransactionWithCategory[];
+    transactions: TransactionWithUserAndCategory[];
     currency?: string;
     calendar?: string;
 }
@@ -61,7 +58,8 @@ export function TransactionsList({ transactions, currency = 'USD', calendar = 'g
     const [search, setSearch] = useState('');
     const [typeFilter, setTypeFilter] = useState<string>('all');
     const [necessityFilter, setNecessityFilter] = useState<string>('all');
-    const [editingTransaction, setEditingTransaction] = useState<TransactionWithCategory | null>(null);
+    const [editingTransaction, setEditingTransaction] = useState<TransactionWithUserAndCategory | null>(null);
+    const [viewingTransaction, setViewingTransaction] = useState<TransactionWithUserAndCategory | null>(null);
 
     const filteredTransactions = transactions.filter((tx) => {
         const matchesSearch = tx.description?.toLowerCase().includes(search.toLowerCase()) ?? true;
@@ -138,7 +136,7 @@ export function TransactionsList({ transactions, currency = 'USD', calendar = 'g
                                     animate={{ opacity: 1, y: 0 }}
                                     exit={{ opacity: 0, y: -10 }}
                                     transition={{ duration: 0.2, delay: index * 0.02 }}
-                                    onClick={() => setEditingTransaction(transaction)}
+                                    onClick={() => setViewingTransaction(transaction)}
                                     className="flex items-start justify-between p-4 rounded-lg border hover:bg-muted/30 transition-colors group cursor-pointer"
                                 >
 
@@ -252,6 +250,18 @@ export function TransactionsList({ transactions, currency = 'USD', calendar = 'g
                     </AnimatePresence>
                 </div>
             </CardContent>
+
+            <TransactionDetailsDialog
+                transaction={viewingTransaction}
+                open={!!viewingTransaction}
+                onOpenChange={(open) => !open && setViewingTransaction(null)}
+                onEdit={(tx) => {
+                    setViewingTransaction(null);
+                    setEditingTransaction(tx);
+                }}
+                currency={currency}
+                calendar={calendar}
+            />
 
             <TransactionFormSheet
                 transaction={editingTransaction}

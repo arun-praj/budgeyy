@@ -14,9 +14,7 @@ import { formatDate } from '@/lib/date-utils';
 import { Loader2 } from 'lucide-react';
 import type { Transaction, Category } from '@/db/schema';
 
-interface TransactionWithCategory extends Transaction {
-    category: Category | null;
-}
+import type { TransactionWithUserAndCategory } from '@/types';
 
 interface DayTransactionsDialogProps {
     date: Date | null;
@@ -33,7 +31,7 @@ export function DayTransactionsDialog({
     currency = 'USD',
     calendar = 'gregorian',
 }: DayTransactionsDialogProps) {
-    const [transactions, setTransactions] = useState<TransactionWithCategory[]>([]);
+    const [transactions, setTransactions] = useState<TransactionWithUserAndCategory[]>([]);
     const [isLoading, setIsLoading] = useState(false);
 
     useEffect(() => {
