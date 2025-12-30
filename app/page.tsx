@@ -1,6 +1,12 @@
 import Link from 'next/link';
 import { ArrowRight, PiggyBank, BarChart3, Shield, Wallet } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Metadata } from 'next';
+
+export const metadata: Metadata = {
+  title: "Budgeyy - The Smart Way to Manage Your Money",
+  description: "Start your journey to financial freedom with Budgeyy. Track expenses, set budgets, and visualize your financial health with our free tool.",
+};
 
 export default function LandingPage() {
   return (

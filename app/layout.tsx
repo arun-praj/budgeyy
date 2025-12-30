@@ -14,9 +14,25 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Budgeyy - Personal Finance & Budget Tracking",
-  description: "Master your finances with the 50/30/20 rule. Track income, expenses, and savings with beautiful visualizations.",
-  keywords: ["budget", "finance", "expense tracker", "50/30/20 rule", "savings"],
+  title: {
+    default: "Budgeyy - Personal Finance Mastered",
+    template: "%s | Budgeyy"
+  },
+  description: "Master your finances with the 50/30/20 rule. Track income, expenses, and savings with beautiful visualizations and localized Nepali calendar support.",
+  keywords: ["budget", "finance", "expense tracker", "50/30/20 rule", "savings", "nepali calendar", "personal finance"],
+  openGraph: {
+    type: "website",
+    locale: "en_US",
+    url: "https://budgeyy.com",
+    title: "Budgeyy - Master Your Personal Finances",
+    description: "The simplest way to track your money using the 50/30/20 rule. Now with Nepali calendar support.",
+    siteName: "Budgeyy",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Budgeyy - Personal Finance Mastered",
+    description: "Master your finances with the 50/30/20 rule. Track income, expenses, and savings with beautiful visualizations.",
+  },
 };
 
 import { ThemeSyncer } from "@/components/providers/theme-syncer";
