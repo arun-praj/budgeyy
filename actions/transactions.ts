@@ -97,7 +97,9 @@ export async function updateTransaction(id: string, data: CreateTransactionData)
 }
 
 export async function getTransactions(options: {
-    limit?: number;
+    page?: number;
+    pageSize?: number;
+    limit?: number; // Legacy, map to pageSize if provided
     start?: Date;
     end?: Date;
     categoryId?: string;
@@ -108,8 +110,12 @@ export async function getTransactions(options: {
     });
 
     if (!session?.user?.id) {
-        return [];
+        return { data: [], totalCount: 0 };
     }
+
+    const page = options.page || 1;
+    const pageSize = options.limit || options.pageSize || 20;
+    const offset = (page - 1) * pageSize;
 
     const conditions = [
         eq(transactions.userId, session.user.id),
@@ -120,17 +126,37 @@ export async function getTransactions(options: {
     if (options.categoryId) conditions.push(eq(transactions.categoryId, options.categoryId));
     if (options.type && options.type !== 'all' as any) conditions.push(eq(transactions.type, options.type));
 
-    const result = await db.query.transactions.findMany({
+    // Get Data
+    const data = await db.query.transactions.findMany({
         where: and(...conditions),
         with: {
             category: true,
             user: true,
         },
         orderBy: [desc(transactions.date)],
-        limit: options.limit || 50,
+        limit: pageSize,
+        offset: offset,
     });
 
-    return result;
+    // Get Total Count
+    // Use raw query for count for performance or simpler aggregation
+    // Or just fetch ID and count in code if dataset is small, but SQL count is better
+    // Drizzle doesn't have a simple count() with query builder conditions easily reuseable
+    // So we repeat conditions in a select count() query
+
+    // We can use db.select({ count: count() }).from(transactions)...
+    // But we need to reconstruct 'and(...conditions)' with the right table reference
+    // The 'conditions' array is already built with imported 'transactions' table reference
+
+    // NOTE: 'count' import needed from drizzle-orm
+    const [countResult] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(transactions)
+        .where(and(...conditions));
+
+    const totalCount = Number(countResult?.count || 0);
+
+    return { data, totalCount };
 }
 
 export async function getDashboardStats({ start, end }: { start: Date; end: Date }) {

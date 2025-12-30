@@ -243,7 +243,7 @@ async function DashboardContent({ searchParams }: { searchParams: Promise<{ [key
             </div>
 
             {/* Recent Transactions */}
-            <RecentTransactions transactions={recentTransactions} currency={currency} calendar={calendar} />
+            <RecentTransactions transactions={recentTransactions.data} currency={currency} calendar={calendar} />
         </>
     );
 }

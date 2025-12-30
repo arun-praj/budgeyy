@@ -3,6 +3,7 @@ import { getUserSettings } from '@/actions/user';
 import { TransactionFormSheet } from '@/components/transactions/transaction-form-sheet';
 import { TransactionsList } from '@/components/transactions/transactions-list';
 import { TransactionFilters } from '@/components/transactions/transaction-filters';
+import { PaginationControl } from '@/components/ui/pagination-control';
 import type { TransactionType } from '@/types';
 
 
@@ -98,16 +99,23 @@ async function TransactionsContent({ searchParams }: { searchParams: Promise<{ [
         }
     }
 
-    const [transactions, userSettings, categories] = await Promise.all([
+    const page = typeof params.page === 'string' ? parseInt(params.page) : 1;
+    const pageSize = 20;
+
+    const [transactionsResult, userSettings, categories] = await Promise.all([
         getTransactions({
             categoryId: categoryId === 'all' ? undefined : categoryId,
             type: validType,
             start,
-            end
+            end,
+            page,
+            pageSize,
         }),
         getUserSettings(),
         getCategories(),
     ]);
+
+    const { data: transactions, totalCount } = transactionsResult;
 
     const currency = userSettings?.currency || 'USD';
     const calendar = userSettings?.calendarPreference || 'gregorian';
@@ -119,6 +127,14 @@ async function TransactionsContent({ searchParams }: { searchParams: Promise<{ [
             </div>
 
             <TransactionsList transactions={transactions} currency={currency} calendar={calendar} />
+
+            <div className="mt-4 flex justify-center">
+                <PaginationControl
+                    currentPage={page}
+                    totalCount={totalCount}
+                    pageSize={pageSize}
+                />
+            </div>
         </>
     );
 }

@@ -47,7 +47,7 @@ export function DayTransactionsDialog({
                 const end = new Date(date);
                 end.setHours(23, 59, 59, 999);
 
-                const data = await getTransactions({ start, end, limit: 100 });
+                const { data } = await getTransactions({ start, end, limit: 100 });
                 setTransactions(data);
             } catch (error) {
                 console.error('Failed to fetch transactions for day:', error);
