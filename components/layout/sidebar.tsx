@@ -14,6 +14,7 @@ import {
     Tags,
     Upload,
     User,
+    Map as MapIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -25,6 +26,9 @@ const navItems = [
     { href: '/calendar', label: 'Calendar', icon: Calendar },
     { href: '/categories', label: 'Categories', icon: Tags },
     { href: '/budgets', label: 'Budgets', icon: PiggyBank },
+    { separator: true },
+    { href: '/splitlog', label: 'Splitlog', icon: MapIcon },
+    { separator: true },
     { href: '/settings', label: 'Profile', icon: User },
 ];
 
@@ -61,14 +65,19 @@ export function Sidebar({ avatarConfig: initialAvatarConfig }: SidebarProps) {
 
             {/* Navigation */}
             <nav className="flex-1 space-y-1 p-4">
-                {navItems.map((item) => {
-                    const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
+                {navItems.map((item, index) => {
+                    if ((item as any).separator) {
+                        return <div key={`sep-${index}`} className="my-2 border-t border-border/50" />;
+                    }
+
+                    const isActive = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(`${item.href}/`));
                     const isProfile = item.href === '/settings';
+                    const Icon = item.icon as any;
 
                     return (
                         <Link
                             key={item.href}
-                            href={item.href}
+                            href={item.href!}
                             className={cn(
                                 'relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
                                 isActive
@@ -88,7 +97,7 @@ export function Sidebar({ avatarConfig: initialAvatarConfig }: SidebarProps) {
                                     <NotionAvatar config={avatarConfig} style={{ width: '100%', height: '100%' }} />
                                 </div>
                             ) : (
-                                <item.icon className="relative z-10 h-5 w-5" />
+                                <Icon className="relative z-10 h-5 w-5" />
                             )}
                             <span className="relative z-10">{item.label}</span>
                         </Link>
