@@ -181,27 +181,7 @@ export function ItineraryTimeline({ items, categories = [] }: ItineraryTimelineP
                         {/* Content (Right) */}
                         <div className="flex-1 pb-10 relative">
 
-                            {/* Hover Add Button - Positioned absolutely relative to the content block */}
-                            <div className="absolute -left-[37px] top-8 opacity-0 group-hover:opacity-100 transition-opacity z-20">
-                                <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                        <Button size="icon" variant="outline" className="h-6 w-6 rounded-full border-dashed border-emerald-500 text-emerald-600 bg-background hover:bg-emerald-50 shadow-sm">
-                                            <Plus className="h-3 w-3" />
-                                        </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="start" side="right">
-                                        <DropdownMenuItem onClick={() => handleCreateNote(item.id)}>
-                                            <StickyNote className="mr-2 h-4 w-4" /> Add Note
-                                        </DropdownMenuItem>
-                                        <DropdownMenuItem onClick={() => handleOpenDialog('checklist', item.id, item.tripId)}>
-                                            <CheckSquare className="mr-2 h-4 w-4" /> Add Checklist
-                                        </DropdownMenuItem>
-                                        <DropdownMenuItem onClick={() => handleOpenDialog('expense', item.id, item.tripId)}>
-                                            <DollarSign className="mr-2 h-4 w-4" /> Add Expense
-                                        </DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
-                            </div>
+
 
                             {/* Header */}
                             <div className="mb-0 pt-1">
@@ -315,6 +295,68 @@ export function ItineraryTimeline({ items, categories = [] }: ItineraryTimelineP
                                         </div>
                                     </div>
                                 ))}
+                                {/* Quick Add Toolbar - Permanent Branch */}
+                                <div className="relative pl-6 group/item mt-4 opacity-50 hover:opacity-100 transition-opacity focus-within:opacity-100">
+                                    {/* Connector */}
+                                    <div className="absolute -left-10 top-0 h-[14px] w-16 border-b-2 border-l-2 border-gray-200 dark:border-gray-800 rounded-bl-xl" />
+
+                                    <div className="flex items-center gap-3">
+                                        {/* Dot/Icon */}
+                                        <div className="h-6 w-6 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-400 flex items-center justify-center shrink-0">
+                                            <div className="h-2 w-2 rounded-full bg-current" />
+                                        </div>
+
+                                        {/* Input & Actions Container */}
+                                        <div className="relative flex-1 flex items-center gap-2">
+                                            <div className="relative w-full">
+                                                <Input
+                                                    placeholder="Add a place..."
+                                                    className="pl-3 pr-24 h-9 bg-transparent border-transparent hover:bg-muted/30 focus:bg-muted/30 focus:border-input transition-colors rounded-lg shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 placeholder:text-muted-foreground/50"
+                                                    onKeyDown={async (e) => {
+                                                        if (e.key === 'Enter') {
+                                                            const val = e.currentTarget.value.trim();
+                                                            if (val) {
+                                                                await createItineraryNote(item.id, val);
+                                                                e.currentTarget.value = '';
+                                                                toast.success('Added');
+                                                            }
+                                                        }
+                                                    }}
+                                                />
+                                                {/* Action Icons Overlay */}
+                                                <div className="absolute right-1 top-1 flex items-center gap-0.5 h-7 bg-background/50 backdrop-blur-[1px] rounded-md px-1">
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="h-6 w-6 text-muted-foreground/60 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
+                                                        onClick={() => handleCreateNote(item.id)}
+                                                        title="Add Note"
+                                                    >
+                                                        <StickyNote className="h-3.5 w-3.5" />
+                                                    </Button>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="h-6 w-6 text-muted-foreground/60 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
+                                                        onClick={() => handleOpenDialog('checklist', item.id, item.tripId)}
+                                                        title="Add Checklist"
+                                                    >
+                                                        <CheckSquare className="h-3.5 w-3.5" />
+                                                    </Button>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="h-6 w-6 text-muted-foreground/60 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
+                                                        onClick={() => handleOpenDialog('expense', item.id, item.tripId)}
+                                                        title="Add Expense"
+                                                    >
+                                                        <DollarSign className="h-3.5 w-3.5" />
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
