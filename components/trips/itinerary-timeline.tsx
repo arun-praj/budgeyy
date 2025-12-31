@@ -296,9 +296,9 @@ export function ItineraryTimeline({ items, categories = [] }: ItineraryTimelineP
                                     </div>
                                 ))}
                                 {/* Quick Add Toolbar - Permanent Branch */}
-                                <div className="relative pl-6 group/item mt-4 opacity-50 hover:opacity-100 transition-opacity focus-within:opacity-100">
-                                    {/* Connector */}
-                                    <div className="absolute -left-10 top-0 h-[14px] w-16 border-b-2 border-l-2 border-gray-200 dark:border-gray-800 rounded-bl-xl" />
+                                <div className="relative pl-6 group/item mt-4 opacity-70 hover:opacity-100 transition-opacity focus-within:opacity-100 pb-2">
+                                    {/* Connector - Shortened */}
+                                    <div className="absolute -left-10 top-0 h-[14px] w-12 border-b-2 border-l-2 border-gray-200 dark:border-gray-800 rounded-bl-xl" />
 
                                     <div className="flex items-center gap-3">
                                         {/* Dot/Icon */}
@@ -306,53 +306,55 @@ export function ItineraryTimeline({ items, categories = [] }: ItineraryTimelineP
                                             <div className="h-2 w-2 rounded-full bg-current" />
                                         </div>
 
-                                        {/* Input & Actions Container */}
-                                        <div className="relative flex-1 flex items-center gap-2">
-                                            <div className="relative w-full">
-                                                <Input
-                                                    placeholder="Add a place..."
-                                                    className="pl-3 pr-24 h-9 bg-transparent border-transparent hover:bg-muted/30 focus:bg-muted/30 focus:border-input transition-colors rounded-lg shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 placeholder:text-muted-foreground/50"
-                                                    onKeyDown={async (e) => {
-                                                        if (e.key === 'Enter') {
-                                                            const val = e.currentTarget.value.trim();
-                                                            if (val) {
-                                                                await createItineraryNote(item.id, val);
-                                                                e.currentTarget.value = '';
-                                                                toast.success('Added');
-                                                            }
+                                        {/* Input & Actions Container - Separated */}
+                                        <div className="flex-1 flex items-center gap-3">
+                                            <Input
+                                                placeholder="Add a place..."
+                                                className="flex-1 h-10 bg-transparent border-transparent hover:bg-muted/30 focus:bg-muted/30 focus:border-input transition-colors rounded-lg shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 placeholder:text-muted-foreground/50"
+                                                onKeyDown={async (e) => {
+                                                    if (e.key === 'Enter') {
+                                                        const val = e.currentTarget.value.trim();
+                                                        if (val) {
+                                                            await createItineraryNote(item.id, val);
+                                                            e.currentTarget.value = '';
+                                                            toast.success('Added');
                                                         }
-                                                    }}
-                                                />
-                                                {/* Action Icons Overlay */}
-                                                <div className="absolute right-1 top-1 flex items-center gap-0.5 h-7 bg-background/50 backdrop-blur-[1px] rounded-md px-1">
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        className="h-6 w-6 text-muted-foreground/60 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
-                                                        onClick={() => handleCreateNote(item.id)}
-                                                        title="Add Note"
-                                                    >
-                                                        <StickyNote className="h-3.5 w-3.5" />
-                                                    </Button>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        className="h-6 w-6 text-muted-foreground/60 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
-                                                        onClick={() => handleOpenDialog('checklist', item.id, item.tripId)}
-                                                        title="Add Checklist"
-                                                    >
-                                                        <CheckSquare className="h-3.5 w-3.5" />
-                                                    </Button>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        className="h-6 w-6 text-muted-foreground/60 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
-                                                        onClick={() => handleOpenDialog('expense', item.id, item.tripId)}
-                                                        title="Add Expense"
-                                                    >
-                                                        <DollarSign className="h-3.5 w-3.5" />
-                                                    </Button>
-                                                </div>
+                                                    }
+                                                }}
+                                            />
+
+                                            {/* Separator */}
+                                            <div className="h-6 w-px bg-border/50 hidden sm:block" />
+
+                                            {/* Action Icons - Larger, Circular, Separate */}
+                                            <div className="flex items-center gap-2">
+                                                <Button
+                                                    variant="outline"
+                                                    size="icon"
+                                                    className="h-9 w-9 rounded-full bg-background border shadow-sm text-muted-foreground hover:text-emerald-600 hover:border-emerald-200 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-all"
+                                                    onClick={() => handleCreateNote(item.id)}
+                                                    title="Add Note"
+                                                >
+                                                    <StickyNote className="h-4 w-4" />
+                                                </Button>
+                                                <Button
+                                                    variant="outline"
+                                                    size="icon"
+                                                    className="h-9 w-9 rounded-full bg-background border shadow-sm text-muted-foreground hover:text-emerald-600 hover:border-emerald-200 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-all"
+                                                    onClick={() => handleOpenDialog('checklist', item.id, item.tripId)}
+                                                    title="Add Checklist"
+                                                >
+                                                    <CheckSquare className="h-4 w-4" />
+                                                </Button>
+                                                <Button
+                                                    variant="outline"
+                                                    size="icon"
+                                                    className="h-9 w-9 rounded-full bg-background border shadow-sm text-muted-foreground hover:text-emerald-600 hover:border-emerald-200 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-all"
+                                                    onClick={() => handleOpenDialog('expense', item.id, item.tripId)}
+                                                    title="Add Expense"
+                                                >
+                                                    <DollarSign className="h-4 w-4" />
+                                                </Button>
                                             </div>
                                         </div>
                                     </div>
