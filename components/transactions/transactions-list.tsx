@@ -137,7 +137,7 @@ export function TransactionsList({ transactions, currency = 'USD', calendar = 'g
                                     exit={{ opacity: 0, y: -10 }}
                                     transition={{ duration: 0.2, delay: index * 0.02 }}
                                     onClick={() => setViewingTransaction(transaction)}
-                                    className="flex items-start justify-between p-4 rounded-lg border hover:bg-muted/30 transition-colors group cursor-pointer"
+                                    className="flex items-start justify-between gap-3 p-4 rounded-lg border hover:bg-muted/30 transition-colors group cursor-pointer"
                                 >
 
                                     <div

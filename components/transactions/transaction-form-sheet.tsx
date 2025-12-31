@@ -255,6 +255,11 @@ export function TransactionFormSheet({
                                                 className="pl-8"
                                                 {...field}
                                                 value={field.value as number | string}
+                                                onFocus={(e) => {
+                                                    if (Number(field.value) === 0) {
+                                                        field.onChange('');
+                                                    }
+                                                }}
                                             />
                                         </div>
                                     </FormControl>
