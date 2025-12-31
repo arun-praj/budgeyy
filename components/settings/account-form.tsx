@@ -18,9 +18,11 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { updateUserProfile } from '@/actions/user';
 import { toast } from 'sonner';
-import { Loader2, RefreshCcw } from 'lucide-react';
+import { Loader2, RefreshCcw, LogOut } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { AvatarConfig } from 'react-notion-avatar';
+import { signOut } from '@/lib/auth-client';
+import { useRouter } from 'next/navigation';
 // @ts-ignore - library types mismatch
 import { getRandomConfig as genConfig } from 'react-notion-avatar';
 
@@ -48,6 +50,7 @@ export function AccountForm({ defaultValues }: AccountFormProps) {
     const [avatarConfig, setAvatarConfig] = useState<AvatarConfig>(
         defaultValues.avatar ? JSON.parse(defaultValues.avatar) : genConfig()
     );
+    const router = useRouter();
 
     const form = useForm<AccountFormValues>({
         resolver: zodResolver(accountFormSchema),
@@ -167,7 +170,24 @@ export function AccountForm({ defaultValues }: AccountFormProps) {
                             />
                         </div>
 
-                        <div className="flex justify-end">
+                        <div className="flex items-center justify-between pt-4 border-t">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 hover:border-destructive/30"
+                                onClick={async () => {
+                                    await signOut({
+                                        fetchOptions: {
+                                            onSuccess: () => {
+                                                router.push('/');
+                                            },
+                                        },
+                                    });
+                                }}
+                            >
+                                <LogOut className="mr-2 h-4 w-4" />
+                                Sign out
+                            </Button>
                             <Button type="submit" disabled={isLoading || !form.formState.isDirty}>
                                 {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                                 Save Changes

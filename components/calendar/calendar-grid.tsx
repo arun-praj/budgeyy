@@ -122,16 +122,16 @@ export function CalendarGrid({ date, data, currency = 'USD', calendar = 'gregori
                             onClick={() => setSelectedDate(day)}
                             className={cn(
                                 "relative flex flex-col items-center sm:items-stretch gap-1 transition-colors cursor-pointer",
-                                // Mobile: square aspect ratio, no borders, minimal padding
-                                "aspect-square p-0.5 border-none",
-                                // Desktop: auto aspect, min height, borders
-                                "sm:aspect-auto sm:min-h-[100px] sm:p-2 sm:border-b sm:border-r sm:last:border-r-0",
+                                // Mobile: rounded tiles with subtle border
+                                "aspect-square p-0.5 m-0.5 rounded-lg border border-border/20",
+                                // Desktop: auto aspect, min height, borders (reset margin/rounding)
+                                "sm:m-0 sm:rounded-none sm:aspect-auto sm:min-h-[100px] sm:p-2 sm:border-b sm:border-r sm:border-border sm:last:border-r-0",
                                 // Hover only on desktop
                                 "sm:hover:bg-muted/50",
                                 // Previous/Next month fading
                                 !isCurrentMonth && "opacity-40 bg-muted/10",
                                 // Current day highlight
-                                isCurrentDay && "bg-primary/5 sm:ring-1 sm:ring-inset sm:ring-primary"
+                                isCurrentDay && "bg-primary/5 border-primary/30 sm:ring-1 sm:ring-inset sm:ring-primary"
                             )}
                         >
                             <span className={cn(

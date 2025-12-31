@@ -9,6 +9,7 @@ import {
     Trash2,
     Filter,
     Search,
+    CreditCard,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -96,29 +97,31 @@ export function TransactionsList({ transactions, currency = 'USD', calendar = 'g
                             className="pl-10"
                         />
                     </div>
-                    <Select value={typeFilter} onValueChange={setTypeFilter}>
-                        <SelectTrigger className="w-full sm:w-[150px]">
-                            <Filter className="mr-2 h-4 w-4" />
-                            <SelectValue placeholder="Type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">All Types</SelectItem>
-                            <SelectItem value="income">Income</SelectItem>
-                            <SelectItem value="expense">Expense</SelectItem>
-                            <SelectItem value="savings">Savings</SelectItem>
-                        </SelectContent>
-                    </Select>
-                    <Select value={necessityFilter} onValueChange={setNecessityFilter}>
-                        <SelectTrigger className="w-full sm:w-[150px]">
-                            <SelectValue placeholder="Category" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">All Categories</SelectItem>
-                            <SelectItem value="needs">Needs</SelectItem>
-                            <SelectItem value="wants">Wants</SelectItem>
-                            <SelectItem value="savings">Savings</SelectItem>
-                        </SelectContent>
-                    </Select>
+                    <div className="flex flex-row gap-3 w-full sm:w-auto">
+                        <Select value={typeFilter} onValueChange={setTypeFilter}>
+                            <SelectTrigger className="flex-1 sm:w-[150px]">
+                                <Filter className="mr-2 h-4 w-4" />
+                                <SelectValue placeholder="Type" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All Types</SelectItem>
+                                <SelectItem value="income">Income</SelectItem>
+                                <SelectItem value="expense">Expense</SelectItem>
+                                <SelectItem value="savings">Savings</SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <Select value={necessityFilter} onValueChange={setNecessityFilter}>
+                            <SelectTrigger className="flex-1 sm:w-[150px]">
+                                <SelectValue placeholder="Category" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All Categories</SelectItem>
+                                <SelectItem value="needs">Needs</SelectItem>
+                                <SelectItem value="wants">Wants</SelectItem>
+                                <SelectItem value="savings">Savings</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
                 </div>
 
                 {/* Transactions List */}
@@ -223,6 +226,12 @@ export function TransactionsList({ transactions, currency = 'USD', calendar = 'g
                                                             )}
                                                         >
                                                             {transaction.necessityLevel}
+                                                        </Badge>
+                                                    )}
+                                                    {transaction.isCredit && (
+                                                        <Badge variant="secondary" className="text-[10px] px-1.5 h-5 gap-1 shrink-0 bg-orange-500/10 text-orange-600 hover:bg-orange-500/20 border-orange-200">
+                                                            <CreditCard className="w-3 h-3" />
+                                                            Credit
                                                         </Badge>
                                                     )}
                                                 </div>

@@ -11,6 +11,7 @@ import { getDashboardStats, getTransactions, getBudgetReportData, getCalendarSta
 import { getUserSettings } from '@/actions/user';
 import { DashboardFilters } from '@/components/dashboard/dashboard-filters';
 import { DownloadBudgetButton } from '@/components/reports/download-button';
+import { Button } from '@/components/ui/button';
 import { getMonthRange, formatDate, formatPeriodLabel } from '@/lib/date-utils';
 import { formatCurrency } from '@/lib/utils';
 import { Suspense } from 'react';
@@ -90,7 +91,20 @@ async function DashboardHeader({ searchParams }: { searchParams: Promise<{ [key:
                 <div className="flex flex-wrap items-center gap-2">
                     <DownloadBudgetButton data={reportData} currency={currency} />
                     <DashboardFilters calendar={calendar} />
-                    <div className="hidden sm:block">
+                    <div className="hidden sm:flex items-center gap-2">
+                        <TransactionFormSheet
+                            calendar={calendar}
+                            trigger={
+                                <Button variant="outline">
+                                    Pay Credit Bill
+                                </Button>
+                            }
+                            initialData={{
+                                type: 'expense',
+                                description: 'Credit Card Bill Payment',
+                                necessityLevel: 'needs', // Usually a need
+                            }}
+                        />
                         <TransactionFormSheet calendar={calendar} />
                     </div>
                 </div>

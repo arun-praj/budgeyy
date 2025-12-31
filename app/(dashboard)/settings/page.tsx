@@ -66,7 +66,7 @@ async function SettingsContent() {
             <TabsList className="grid w-full grid-cols-3 lg:w-[400px]">
                 <TabsTrigger value="account">Account</TabsTrigger>
                 <TabsTrigger value="general">General</TabsTrigger>
-                <TabsTrigger value="deleted">Deleted</TabsTrigger>
+                <TabsTrigger value="deleted">Trash</TabsTrigger>
             </TabsList>
 
             <TabsContent value="account" className="space-y-4">

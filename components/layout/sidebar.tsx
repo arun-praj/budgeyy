@@ -18,7 +18,6 @@ import {
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/layout/theme-toggle';
-import { signOut } from '@/lib/auth-client';
 
 const navItems = [
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -29,13 +28,26 @@ const navItems = [
     { href: '/settings', label: 'Profile', icon: User },
 ];
 
-export function Sidebar() {
-    const pathname = usePathname();
+// @ts-ignore - library types mismatch
+import { getRandomConfig as genConfig } from 'react-notion-avatar';
+import dynamic from 'next/dynamic';
+import { AvatarConfig } from 'react-notion-avatar';
 
-    const handleSignOut = async () => {
-        await signOut();
-        window.location.href = '/login';
-    };
+const NotionAvatar = dynamic(() => import('react-notion-avatar').then(mod => mod.default), {
+    ssr: false,
+    loading: () => <User className="h-5 w-5" />, // Fallback to User icon
+});
+
+interface SidebarProps {
+    avatarConfig?: AvatarConfig | string | null;
+}
+
+export function Sidebar({ avatarConfig: initialAvatarConfig }: SidebarProps) {
+    const pathname = usePathname();
+    // Parse avatar config if it's a string, or use default
+    const avatarConfig = typeof initialAvatarConfig === 'string'
+        ? JSON.parse(initialAvatarConfig)
+        : initialAvatarConfig;
 
     const SidebarContent = () => (
         <div className="flex h-full flex-col">
@@ -51,6 +63,8 @@ export function Sidebar() {
             <nav className="flex-1 space-y-1 p-4">
                 {navItems.map((item) => {
                     const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
+                    const isProfile = item.href === '/settings';
+
                     return (
                         <Link
                             key={item.href}
@@ -69,7 +83,13 @@ export function Sidebar() {
                                     transition={{ type: 'spring', bounce: 0.2, duration: 0.6 }}
                                 />
                             )}
-                            <item.icon className="relative z-10 h-5 w-5" />
+                            {isProfile && avatarConfig ? (
+                                <div className="relative z-10 h-6 w-6 rounded-full border border-border overflow-hidden bg-background">
+                                    <NotionAvatar config={avatarConfig} style={{ width: '100%', height: '100%' }} />
+                                </div>
+                            ) : (
+                                <item.icon className="relative z-10 h-5 w-5" />
+                            )}
                             <span className="relative z-10">{item.label}</span>
                         </Link>
                     );
@@ -82,14 +102,6 @@ export function Sidebar() {
                     <span className="text-sm text-muted-foreground">Theme</span>
                     <ThemeToggle />
                 </div>
-                <Button
-                    variant="ghost"
-                    className="w-full justify-start text-muted-foreground hover:text-destructive"
-                    onClick={handleSignOut}
-                >
-                    <LogOut className="mr-2 h-4 w-4" />
-                    Sign out
-                </Button>
             </div>
         </div>
     );

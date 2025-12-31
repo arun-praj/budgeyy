@@ -77,13 +77,13 @@ const necessityOptions = [
     { value: 'wants', label: 'Wants', color: 'bg-purple-500', description: 'Discretionary spending (Dining, Entertainment)' },
 ] as const;
 
-
 interface TransactionFormSheetProps {
     transaction?: TransactionWithCategory | null;
     open?: boolean;
     onOpenChange?: (open: boolean) => void;
     calendar?: CalendarPreference | string | null;
     trigger?: React.ReactNode;
+    initialData?: Partial<TransactionFormValues>;
 }
 
 export function TransactionFormSheet({
@@ -92,6 +92,7 @@ export function TransactionFormSheet({
     onOpenChange: setControlledOpen,
     calendar = 'gregorian',
     trigger,
+    initialData,
 }: TransactionFormSheetProps = {}) {
     const router = useRouter();
     const [internalOpen, setInternalOpen] = useState(false);
@@ -138,19 +139,19 @@ export function TransactionFormSheet({
             });
         } else if (!open) {
             form.reset({
-                type: 'expense',
-                amount: 0,
+                type: (initialData?.type as any) || 'expense',
+                amount: initialData?.amount || 0,
                 date: new Date().toISOString().split('T')[0],
-                description: '',
-                categoryId: '',
-                necessityLevel: 'needs',
+                description: initialData?.description || '',
+                categoryId: initialData?.categoryId || '',
+                necessityLevel: initialData?.necessityLevel || 'needs',
                 isRecurring: false,
                 isCredit: false,
                 receiptUrl: '',
                 productImageUrl: '',
             });
         }
-    }, [transaction, form, open]);
+    }, [transaction, form, open, initialData]);
 
     const transactionType = form.watch('type');
 
@@ -394,37 +395,57 @@ export function TransactionFormSheet({
                                     <FormField
                                         control={form.control}
                                         name="isCredit"
-                                        render={({ field }) => (
-                                            <FormItem className="pt-4">
-                                                <div
-                                                    className={cn(
-                                                        'flex items-center justify-between rounded-lg border p-3 cursor-pointer transition-colors',
-                                                        field.value ? 'border-primary bg-primary/5' : 'border-border'
-                                                    )}
-                                                    onClick={() => field.onChange(!field.value)}
-                                                >
-                                                    <div className="flex items-center gap-3">
-                                                        <div className={cn(
-                                                            'flex items-center justify-center bg-background border p-2 rounded-md',
-                                                            field.value ? 'border-primary' : 'border-muted'
-                                                        )}>
-                                                            💳
+                                        render={({ field }) => {
+                                            // Calculate billing date based on current date
+                                            const txDate = new Date(form.watch('date'));
+                                            const day = txDate.getDate();
+                                            const month = txDate.getMonth();
+                                            const year = txDate.getFullYear();
+
+                                            // Logic: If >= 25th, billed in month+2. If < 25th, billed in month+1.
+                                            // 10th of the month.
+                                            let billingMonth = month + 1;
+                                            if (day >= 25) {
+                                                billingMonth = month + 2;
+                                            }
+
+                                            const billingDate = new Date(year, billingMonth, 10);
+                                            const billingDateString = billingDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+
+                                            return (
+                                                <FormItem className="pt-4">
+                                                    <div
+                                                        className={cn(
+                                                            'flex items-center justify-between rounded-lg border p-3 cursor-pointer transition-colors',
+                                                            field.value ? 'border-primary bg-primary/5' : 'border-border'
+                                                        )}
+                                                        onClick={() => field.onChange(!field.value)}
+                                                    >
+                                                        <div className="flex items-center gap-3">
+                                                            <div className={cn(
+                                                                'flex items-center justify-center bg-background border p-2 rounded-md',
+                                                                field.value ? 'border-primary' : 'border-muted'
+                                                            )}>
+                                                                💳
+                                                            </div>
+                                                            <div>
+                                                                <p className="font-medium text-sm">Paid with Credit Card</p>
+                                                                <p className="text-xs text-muted-foreground">
+                                                                    {field.value
+                                                                        ? `Bill due on ${billingDateString}`
+                                                                        : 'Track as credit transaction'}
+                                                                </p>
+                                                            </div>
                                                         </div>
-                                                        <div>
-                                                            <p className="font-medium text-sm">Paid with Credit Card</p>
-                                                            <p className="text-xs text-muted-foreground">
-                                                                Deducted from salary on 10th
-                                                            </p>
-                                                        </div>
+                                                        {field.value && (
+                                                            <Badge variant="secondary">
+                                                                Credit
+                                                            </Badge>
+                                                        )}
                                                     </div>
-                                                    {field.value && (
-                                                        <Badge variant="secondary">
-                                                            Credit
-                                                        </Badge>
-                                                    )}
-                                                </div>
-                                            </FormItem>
-                                        )}
+                                                </FormItem>
+                                            );
+                                        }}
                                     />
                                 </motion.div>
                             )}

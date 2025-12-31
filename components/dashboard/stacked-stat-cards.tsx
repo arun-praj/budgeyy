@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { motion, PanInfo } from 'framer-motion';
 import { StatCard } from './stat-card';
 import { cn } from '@/lib/utils';
-import { ChevronUp, ChevronDown } from 'lucide-react';
 
 interface StackedStatCardsProps {
     stats: Array<React.ComponentProps<typeof StatCard>>;
@@ -65,9 +64,9 @@ export function StackedStatCards({ stats, className }: StackedStatCardsProps) {
                                 : { type: "spring", stiffness: 300, damping: 30 }
                         }
                         className={cn(
-                            "absolute w-full max-w-sm rounded-xl overflow-hidden",
-                            "border-t border-white/20",
-                            isCurrent ? "shadow-2xl" : "brightness-[0.9] shadow-lg",
+                            "absolute w-full rounded-xl overflow-hidden bg-background", // Added bg-background to ensure it's not transparent
+                            "border border-border", // semantic border
+                            isCurrent ? "shadow-xl" : "shadow-sm", // Simplified shadows
                             // Ensure clicks don't register on hidden/back cards just in case
                             isHidden && "pointer-events-none"
                         )}
@@ -79,13 +78,6 @@ export function StackedStatCards({ stats, className }: StackedStatCardsProps) {
                     </motion.div>
                 );
             })}
-
-            {/* Helper Indicators */}
-            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex flex-col gap-1 items-center z-20 opacity-50 pointer-events-none">
-                <ChevronUp className="w-4 h-4 animate-bounce" />
-                <span className="text-[10px] font-medium vertical-rl py-1">Swipe</span>
-                <ChevronDown className="w-4 h-4 animate-bounce" />
-            </div>
         </div>
     );
 }

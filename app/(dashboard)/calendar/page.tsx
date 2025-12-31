@@ -61,7 +61,13 @@ async function CalendarContent({ searchParams }: { searchParams: Promise<{ [key:
                 <CalendarHeader date={currentDate} calendar={calendar} />
             </Suspense>
             <div className="flex-1 min-h-0 border rounded-lg shadow-sm overflow-auto">
-                <CalendarGrid date={currentDate} data={realStats} currency={currency} calendar={calendar} />
+                <CalendarGrid
+                    key={currentDate.toISOString()}
+                    date={currentDate}
+                    data={realStats}
+                    currency={currency}
+                    calendar={calendar}
+                />
             </div>
         </>
     );

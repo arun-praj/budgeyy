@@ -202,23 +202,20 @@ export async function getDashboardStats({ start, end }: { start: Date; end: Date
             stats.savingsAmount += amount;
         } else {
             // Expenses
-            stats.totalExpenses += amount;
+            // Only count non-credit expenses effectively reducing the balance immediately
+            if (!tx.isCredit) {
+                stats.totalExpenses += amount;
 
-            switch (tx.necessityLevel) {
-                case 'needs':
-                    stats.needsSpent += amount;
-                    break;
-                case 'wants':
-                    stats.wantsSpent += amount;
-                    break;
-                // Legacy support: if 'savings' was stored as necessity level in old expenses
-                // We should probably NOT count it as expense if we want strict separation, 
-                // but for now let's assume moving forward we use type='savings'.
-                // If legacy data exists, it stays as expense.
-                case 'savings':
-                    // Optional: could subtract from totalExpenses and add to savingsAmount if migrating on the fly
-                    // But simpler to just respect the 'type'.
-                    break;
+                switch (tx.necessityLevel) {
+                    case 'needs':
+                        stats.needsSpent += amount;
+                        break;
+                    case 'wants':
+                        stats.wantsSpent += amount;
+                        break;
+                    case 'savings':
+                        break;
+                }
             }
         }
     }

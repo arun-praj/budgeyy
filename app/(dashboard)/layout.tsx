@@ -17,7 +17,9 @@ export default function DashboardLayout({
 }) {
     return (
         <div className="flex min-h-screen bg-background">
-            <Sidebar />
+            <Suspense fallback={<Sidebar />}>
+                <ConnectedSidebar />
+            </Suspense>
             <main className="flex-1 overflow-auto md:ml-64">
                 <div className="container mx-auto p-4 md:p-6 lg:p-8 pt-6 pb-24 md:pb-6">
                     {children}
@@ -29,6 +31,11 @@ export default function DashboardLayout({
             <Toaster />
         </div>
     );
+}
+
+async function ConnectedSidebar() {
+    const userSettings = await getUserSettings();
+    return <Sidebar avatarConfig={userSettings?.avatar} />;
 }
 
 async function ConnectedBottomNav() {

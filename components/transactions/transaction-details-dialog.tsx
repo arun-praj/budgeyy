@@ -201,6 +201,36 @@ export function TransactionDetailsDialog({
                                 </div>
 
                                 <div className="flex flex-col items-end gap-1 text-xs text-muted-foreground">
+                                    <div className="flex items-center justify-between py-1">
+                                        <span className="text-muted-foreground">Type</span>
+                                        <span className="capitalize">{transaction.type}</span>
+                                    </div>
+                                    {transaction.isCredit && (
+                                        <div className="flex items-center justify-between py-1">
+                                            <span className="text-muted-foreground">Payment</span>
+                                            <div className="flex flex-col items-end">
+                                                <Badge variant="outline" className="gap-1">
+                                                    Credit Card 💳
+                                                </Badge>
+                                                <span className="text-xs text-muted-foreground mt-0.5">
+                                                    {(() => {
+                                                        const txDate = new Date(transaction.date);
+                                                        const day = txDate.getDate();
+                                                        const month = txDate.getMonth();
+                                                        const year = txDate.getFullYear();
+
+                                                        let billingMonth = month + 1;
+                                                        if (day >= 25) {
+                                                            billingMonth = month + 2;
+                                                        }
+
+                                                        const billingDate = new Date(year, billingMonth, 10);
+                                                        return `Bill due: ${billingDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+                                                    })()}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    )}
                                     <div className="flex items-center gap-1.5">
                                         <Clock className="h-3 w-3" />
                                         Created {new Date(transaction.createdAt).toLocaleDateString()}
