@@ -107,6 +107,7 @@ export const transactions = pgTable('transactions', {
     isCredit: boolean('is_credit').default(false),
     userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
     tripId: uuid('trip_id').references(() => trips.id, { onDelete: 'set null' }),
+    tripItineraryId: uuid('trip_itinerary_id').references(() => tripItineraries.id, { onDelete: 'set null' }),
     // Images
     receiptUrl: text('receipt_url'),
     productImageUrl: text('product_image_url'),
@@ -188,6 +189,10 @@ export const transactionsRelations = relations(transactions, ({ one }) => ({
         fields: [transactions.tripId],
         references: [trips.id],
     }),
+    itinerary: one(tripItineraries, {
+        fields: [transactions.tripItineraryId],
+        references: [tripItineraries.id],
+    }),
 }));
 
 export const budgetsRelations = relations(budgets, ({ one }) => ({
@@ -252,6 +257,26 @@ export const tripItineraries = pgTable('trip_itineraries', {
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
 
+// Itinerary Notes
+export const itineraryNotes = pgTable('itinerary_notes', {
+    id: uuid('id').primaryKey().defaultRandom(),
+    tripItineraryId: uuid('trip_itinerary_id').notNull().references(() => tripItineraries.id, { onDelete: 'cascade' }),
+    content: text('content').notNull(),
+    isHighPriority: boolean('is_high_priority').default(false),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
+// Itinerary Checklists
+export const itineraryChecklists = pgTable('itinerary_checklists', {
+    id: uuid('id').primaryKey().defaultRandom(),
+    tripItineraryId: uuid('trip_itinerary_id').notNull().references(() => tripItineraries.id, { onDelete: 'cascade' }),
+    title: text('title').notNull(),
+    items: text('items').default('[]'), // JSON array of checklist items
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
 // Trip Invites
 export const tripInvites = pgTable('trip_invites', {
     id: uuid('id').primaryKey().defaultRandom(),
@@ -279,10 +304,27 @@ export const tripsRelations = relations(trips, ({ one, many }) => ({
     invites: many(tripInvites),
 }));
 
-export const tripItinerariesRelations = relations(tripItineraries, ({ one }) => ({
+export const tripItinerariesRelations = relations(tripItineraries, ({ one, many }) => ({
     trip: one(trips, {
         fields: [tripItineraries.tripId],
         references: [trips.id],
+    }),
+    notes: many(itineraryNotes),
+    checklists: many(itineraryChecklists),
+    transactions: many(transactions),
+}));
+
+export const itineraryNotesRelations = relations(itineraryNotes, ({ one }) => ({
+    itinerary: one(tripItineraries, {
+        fields: [itineraryNotes.tripItineraryId],
+        references: [tripItineraries.id],
+    }),
+}));
+
+export const itineraryChecklistsRelations = relations(itineraryChecklists, ({ one }) => ({
+    itinerary: one(tripItineraries, {
+        fields: [itineraryChecklists.tripItineraryId],
+        references: [tripItineraries.id],
     }),
 }));
 

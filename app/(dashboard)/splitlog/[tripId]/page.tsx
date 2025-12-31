@@ -9,6 +9,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { NotionAvatar } from '@/components/avatars/notion-avatar';
 import { AvatarConfig } from '@/components/avatars/notion-avatar/types';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { TripNotes } from '@/components/trips/trip-notes';
+import { ItineraryTimeline } from '@/components/trips/itinerary-timeline';
 
 export const dynamic = 'force-dynamic';
 
@@ -144,6 +146,9 @@ export default async function TripDetailsPage(props: TripDetailsPageProps) {
                                         <h3 className="font-medium text-muted-foreground mb-1">Description</h3>
                                         <p>{trip.description || 'No description added.'}</p>
                                     </div>
+                                    <div className="pt-4 border-t">
+                                        <TripNotes tripId={trip.id} initialNotes={trip.notes} />
+                                    </div>
                                 </CardContent>
                             </Card>
                         </TabsContent>
@@ -152,24 +157,11 @@ export default async function TripDetailsPage(props: TripDetailsPageProps) {
                             <div className="flex items-center justify-between">
                                 <h2 className="text-xl font-semibold">Itinerary</h2>
                                 <Button size="sm">
-                                    <Plus className="h-4 w-4 mr-1" /> Add Item
+                                    <Plus className="h-4 w-4 mr-1" /> Add Day
                                 </Button>
                             </div>
-                            {trip.itineraries.length === 0 ? (
-                                <div className="text-center py-12 border border-dashed rounded-lg bg-muted/20">
-                                    <p className="text-muted-foreground mb-4">No itinerary items yet.</p>
-                                    <Button variant="outline">Start planning your days</Button>
-                                </div>
-                            ) : (
-                                <div className="space-y-8">
-                                    {trip.itineraries.map((item) => (
-                                        <div key={item.id} className="border rounded-lg p-4">
-                                            <div className="font-medium">Day {item.dayNumber}</div>
-                                            <div>{item.title}</div>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
+
+                            <ItineraryTimeline items={trip.itineraries} />
                         </TabsContent>
 
                         <TabsContent value="expenses">

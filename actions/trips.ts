@@ -63,6 +63,37 @@ export async function createTrip(data: {
         );
     }
 
+    // Auto-generate itinerary days
+    if (data.startDate && data.endDate) {
+        const days = [];
+        let currentDate = new Date(data.startDate);
+        const end = new Date(data.endDate);
+        let dayCount = 1;
+
+        while (currentDate <= end) {
+            days.push({
+                tripId: newTrip.id,
+                dayNumber: dayCount,
+                date: new Date(currentDate),
+                title: '', // Pending user input
+            });
+            currentDate.setDate(currentDate.getDate() + 1);
+            dayCount++;
+        }
+
+        if (days.length > 0) {
+            await db.insert(schema.tripItineraries).values(days);
+        }
+    } else if (data.startDate) {
+        // Single day trip if no end date
+        await db.insert(schema.tripItineraries).values({
+            tripId: newTrip.id,
+            dayNumber: 1,
+            date: data.startDate,
+            title: '',
+        });
+    }
+
     revalidatePath('/splitlog');
     return newTrip.id;
 }
@@ -114,7 +145,14 @@ export async function getTrip(tripId: string) {
         where: eq(trips.id, tripId),
         with: {
             itineraries: {
-                orderBy: [desc(schema.tripItineraries.dayNumber)],
+                orderBy: (itineraries, { asc }) => [asc(itineraries.dayNumber)],
+                with: {
+                    transactions: {
+                        where: (transactions, { eq }) => eq(transactions.isDeleted, false)
+                    },
+                    notes: true,
+                    checklists: true,
+                }
             },
             // Include invites
             invites: true,
@@ -138,4 +176,121 @@ export async function getTrip(tripId: string) {
     }
 
     return trip;
+}
+
+export async function updateItineraryDay(itineraryId: string, data: { title?: string; location?: string }) {
+    const session = await auth.api.getSession({
+        headers: await headers()
+    });
+
+    if (!session?.user) {
+        throw new Error('Unauthorized');
+    }
+
+    // TODO: Add strict ownership check here (verify user owns the trip linked to this itinerary)
+
+    await db.update(schema.tripItineraries)
+        .set({
+            ...data,
+            updatedAt: new Date()
+        })
+        .where(eq(schema.tripItineraries.id, itineraryId));
+
+    revalidatePath('/splitlog/[tripId]'); // Revalidate the trip page
+}
+
+export async function createItineraryNote(itineraryId: string, content: string, isHighPriority: boolean = false) {
+    const session = await auth.api.getSession({
+        headers: await headers()
+    });
+
+    if (!session?.user) throw new Error('Unauthorized');
+
+    const [note] = await db.insert(schema.itineraryNotes).values({
+        tripItineraryId: itineraryId,
+        content,
+        isHighPriority,
+    }).returning();
+
+    revalidatePath('/splitlog/[tripId]');
+    return note;
+}
+
+export async function updateItineraryNote(noteId: string, content: string, isHighPriority?: boolean) {
+    const session = await auth.api.getSession({
+        headers: await headers()
+    });
+
+    if (!session?.user) throw new Error('Unauthorized');
+
+    const [note] = await db.update(schema.itineraryNotes)
+        .set({
+            content,
+            ...(isHighPriority !== undefined ? { isHighPriority } : {}),
+            updatedAt: new Date()
+        })
+        .where(eq(schema.itineraryNotes.id, noteId))
+        .returning();
+
+    revalidatePath('/splitlog/[tripId]');
+    return note;
+}
+
+export async function createItineraryChecklist(itineraryId: string, title: string) {
+    const session = await auth.api.getSession({
+        headers: await headers()
+    });
+
+    if (!session?.user) throw new Error('Unauthorized');
+
+    await db.insert(schema.itineraryChecklists).values({
+        tripItineraryId: itineraryId,
+        title,
+        items: '[]',
+    });
+
+    revalidatePath('/splitlog/[tripId]');
+}
+
+export async function deleteItineraryNote(noteId: string) {
+    const session = await auth.api.getSession({
+        headers: await headers()
+    });
+
+    if (!session?.user) throw new Error('Unauthorized');
+
+    await db.delete(schema.itineraryNotes)
+        .where(eq(schema.itineraryNotes.id, noteId));
+
+    revalidatePath('/splitlog/[tripId]');
+}
+
+export async function deleteItineraryChecklist(checklistId: string) {
+    const session = await auth.api.getSession({
+        headers: await headers()
+    });
+
+    if (!session?.user) throw new Error('Unauthorized');
+
+    await db.delete(schema.itineraryChecklists)
+        .where(eq(schema.itineraryChecklists.id, checklistId));
+
+    revalidatePath('/splitlog/[tripId]');
+}
+
+export async function deleteTripTransaction(transactionId: string) {
+    const session = await auth.api.getSession({
+        headers: await headers()
+    });
+
+    if (!session?.user) throw new Error('Unauthorized');
+
+    await db.update(schema.transactions)
+        .set({
+            isDeleted: true,
+            deletedAt: new Date()
+        })
+        .where(eq(schema.transactions.id, transactionId));
+
+    revalidatePath('/splitlog/[tripId]');
 }

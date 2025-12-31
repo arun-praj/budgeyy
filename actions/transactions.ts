@@ -20,6 +20,8 @@ export interface CreateTransactionData {
     isCredit?: boolean;
     receiptUrl?: string;
     productImageUrl?: string;
+    tripId?: string;
+    tripItineraryId?: string;
 }
 
 export async function createTransaction(data: CreateTransactionData) {
@@ -41,6 +43,8 @@ export async function createTransaction(data: CreateTransactionData) {
                 isCredit: data.isCredit || false,
                 receiptUrl: data.receiptUrl,
                 productImageUrl: data.productImageUrl,
+                tripId: data.tripId,
+                tripItineraryId: data.tripItineraryId,
                 userId: session.user.id,
             })
             .returning();
