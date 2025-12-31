@@ -106,6 +106,7 @@ export const transactions = pgTable('transactions', {
     necessityLevel: necessityLevelEnum('necessity_level'),
     isCredit: boolean('is_credit').default(false),
     userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    tripId: uuid('trip_id').references(() => trips.id, { onDelete: 'set null' }),
     // Images
     receiptUrl: text('receipt_url'),
     productImageUrl: text('product_image_url'),
@@ -183,6 +184,10 @@ export const transactionsRelations = relations(transactions, ({ one }) => ({
         fields: [transactions.categoryId],
         references: [categories.id],
     }),
+    trip: one(trips, {
+        fields: [transactions.tripId],
+        references: [trips.id],
+    }),
 }));
 
 export const budgetsRelations = relations(budgets, ({ one }) => ({
@@ -207,3 +212,86 @@ export type Budget = typeof budgets.$inferSelect;
 export type NewBudget = typeof budgets.$inferInsert;
 export type UserSurvey = typeof userSurveys.$inferSelect;
 export type NewUserSurvey = typeof userSurveys.$inferInsert;
+// Friends table
+export const friends = pgTable('friends', {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }), // The user who added the friend
+    friendUserId: text('friend_user_id').references(() => users.id), // Optional: link to actual user if they exist
+    name: text('name').notNull(), // Nickname or real name
+    email: text('email'), // Optional email for inviting
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
+// Trips table
+export const trips = pgTable('trips', {
+    id: uuid('id').primaryKey().defaultRandom(),
+    name: text('name').notNull(), // WhereTo
+    destination: text('destination'),
+    imageUrl: text('image_url'),
+    startDate: timestamp('start_date').notNull(),
+    endDate: timestamp('end_date'),
+    description: text('description'),
+    notes: text('notes'), // General notes for the trip
+    userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }), // Creator
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
+// Trip Itineraries (Days)
+export const tripItineraries = pgTable('trip_itineraries', {
+    id: uuid('id').primaryKey().defaultRandom(),
+    tripId: uuid('trip_id').notNull().references(() => trips.id, { onDelete: 'cascade' }),
+    dayNumber: integer('day_number').notNull(),
+    date: timestamp('date'),
+    title: text('title'), // Place visited or Title
+    description: text('description'), // Notes
+    location: text('location'),
+    links: text('links'), // Simplified to text for now, could be JSON
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
+// Trip Invites
+export const tripInvites = pgTable('trip_invites', {
+    id: uuid('id').primaryKey().defaultRandom(),
+    tripId: uuid('trip_id').notNull().references(() => trips.id, { onDelete: 'cascade' }),
+    email: text('email').notNull(),
+    status: text('status', { enum: ['pending', 'accepted', 'rejected'] }).default('pending'),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+
+// Add relations exports
+export const friendsRelations = relations(friends, ({ one }) => ({
+    user: one(users, {
+        fields: [friends.userId],
+        references: [users.id],
+    }),
+}));
+
+export const tripsRelations = relations(trips, ({ one, many }) => ({
+    user: one(users, {
+        fields: [trips.userId],
+        references: [users.id],
+    }),
+    itineraries: many(tripItineraries),
+    transactions: many(transactions),
+    invites: many(tripInvites),
+}));
+
+export const tripItinerariesRelations = relations(tripItineraries, ({ one }) => ({
+    trip: one(trips, {
+        fields: [tripItineraries.tripId],
+        references: [trips.id],
+    }),
+}));
+
+export const tripInvitesRelations = relations(tripInvites, ({ one }) => ({
+    trip: one(trips, {
+        fields: [tripInvites.tripId],
+        references: [trips.id],
+    }),
+}));
+
+// Update transactions relations in existing code to include trip
+// (This needs to be merged with existing transactionsRelations or handled by the user)
