@@ -183,21 +183,19 @@ export function ItineraryTimeline({ items, categories = [] }: ItineraryTimelineP
 
 
 
-                            {/* Header */}
-                            <div className="mb-0 pt-1">
-                                <div className="flex items-center justify-between">
-                                    <h3 className="text-lg font-bold text-foreground leading-none">
-                                        {item.date ? format(new Date(item.date), 'EEEE, MMMM do') : `Day ${item.dayNumber}`}
-                                    </h3>
+                            {/* Header: Date + Title Inline */}
+                            <div className="flex flex-wrap items-center gap-3 mb-2 pt-1 h-8">
+                                <h3 className="text-lg font-bold text-foreground leading-none shrink-0">
+                                    {item.date ? format(new Date(item.date), 'EEEE, MMMM do') : `Day ${item.dayNumber}`}
+                                </h3>
+                                {/* Editable Title & Location - Now Inline */}
+                                <div className="h-full flex items-center">
+                                    <ItineraryTitleEditor id={item.id} initialTitle={item.title} initialLocation={item.location} />
                                 </div>
-
-                                {/* Editable Title & Location */}
-                                <ItineraryTitleEditor id={item.id} initialTitle={item.title} initialLocation={item.location} />
-
                             </div>
 
                             {/* Timeline Content Nodes */}
-                            <div className="space-y-4 mt-4">
+                            <div className="space-y-4">
                                 {/* Transactions Node */}
                                 {item.transactions?.length > 0 && (
                                     <div className="relative">
@@ -205,7 +203,7 @@ export function ItineraryTimeline({ items, categories = [] }: ItineraryTimelineP
                                             <div key={txn.id} className="flex items-start gap-3 mb-3 relative pl-6 group/item">
                                                 {/* Branch Line style */}
                                                 {/* Curved Branch Line */}
-                                                <div className="absolute -left-10 top-0 h-[14px] w-16 border-b-2 border-l-2 border-gray-200 dark:border-gray-800 rounded-bl-xl" />
+                                                <div className="absolute -left-10 top-0 h-[14px] w-12 border-b-2 border-l-2 border-gray-200 dark:border-gray-800 rounded-bl-xl" />
 
                                                 <div className="h-6 w-6 rounded-full bg-blue-50 dark:bg-blue-900/20 text-blue-600 flex items-center justify-center shrink-0 text-[10px] mt-0.5">
                                                     $
@@ -260,7 +258,7 @@ export function ItineraryTimeline({ items, categories = [] }: ItineraryTimelineP
                                 {/* Checklists Node */}
                                 {item.checklists?.length > 0 && item.checklists.map((list: any) => (
                                     <div key={list.id} className="relative pl-6 group/item">
-                                        <div className="absolute -left-10 top-0 h-[14px] w-16 border-b-2 border-l-2 border-gray-200 dark:border-gray-800 rounded-bl-xl" />
+                                        <div className="absolute -left-10 top-0 h-[14px] w-12 border-b-2 border-l-2 border-gray-200 dark:border-gray-800 rounded-bl-xl" />
 
                                         <div className="flex gap-3">
                                             <div className="h-6 w-6 rounded-full bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 flex items-center justify-center shrink-0 mt-0.5">
@@ -298,7 +296,7 @@ export function ItineraryTimeline({ items, categories = [] }: ItineraryTimelineP
                                 {/* Quick Add Toolbar - Permanent Branch */}
                                 <div className="relative pl-6 group/item mt-4 opacity-70 hover:opacity-100 transition-opacity focus-within:opacity-100 pb-2">
                                     {/* Connector - Shortened */}
-                                    <div className="absolute -left-10 top-0 h-[14px] w-12 border-b-2 border-l-2 border-gray-200 dark:border-gray-800 rounded-bl-xl" />
+                                    <div className="absolute -left-10 top-0 h-[14px] w-8 border-b-2 border-l-2 border-gray-200 dark:border-gray-800 rounded-bl-xl" />
 
                                     <div className="flex items-center gap-3">
                                         {/* Dot/Icon */}
