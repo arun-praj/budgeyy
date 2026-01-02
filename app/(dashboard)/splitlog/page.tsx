@@ -82,10 +82,10 @@ async function TripsContent() {
                                 </p>
                             </CardContent>
                             <CardFooter className="text-xs text-muted-foreground border-t pt-4 flex justify-between mt-auto">
-                                <span>{format(trip.startDate, 'MMM d, yyyy')}</span>
+                                <span>{trip.startDate ? format(trip.startDate, 'MMM d, yyyy') : 'No Date'}</span>
                                 {/* Placeholder for "days" or "participants" */}
                                 <span>
-                                    {trip.endDate
+                                    {trip.endDate && trip.startDate
                                         ? `${Math.ceil((trip.endDate.getTime() - trip.startDate.getTime()) / (1000 * 60 * 60 * 24))} days`
                                         : 'Ongoing'}
                                 </span>

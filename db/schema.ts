@@ -94,6 +94,35 @@ export const categories = pgTable('categories', {
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
 
+// Trips table
+export const trips = pgTable('trips', {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    description: text('description'),
+    destination: text('destination'),
+    imageUrl: text('image_url'),
+    notes: text('notes'),
+    startDate: timestamp('start_date'),
+    endDate: timestamp('end_date'),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
+// Trip Itineraries (Days)
+export const tripItineraries = pgTable('trip_itineraries', {
+    id: uuid('id').primaryKey().defaultRandom(),
+    tripId: uuid('trip_id').notNull().references(() => trips.id, { onDelete: 'cascade' }),
+    dayNumber: integer('day_number').notNull(),
+    date: timestamp('date'),
+    title: text('title'),
+    description: text('description'),
+    links: text('links'),
+    location: text('location'),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
 // Transactions table
 export const transactions = pgTable('transactions', {
     id: uuid('id').primaryKey().defaultRandom(),
@@ -114,6 +143,29 @@ export const transactions = pgTable('transactions', {
     // Soft Delete
     isDeleted: boolean('is_delete').default(false).notNull(),
     deletedAt: timestamp('deleted_at'),
+    order: integer('order').default(0),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
+// Trip Transactions table (Splitlog)
+export const tripTransactions = pgTable('trip_transactions', {
+    id: uuid('id').primaryKey().defaultRandom(),
+    amount: decimal('amount', { precision: 12, scale: 2 }).notNull(),
+    date: timestamp('date').notNull(),
+    description: text('description'),
+    type: transactionTypeEnum('type').notNull(),
+    categoryId: uuid('category_id').references(() => categories.id, { onDelete: 'set null' }),
+    userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    tripId: uuid('trip_id').notNull().references(() => trips.id, { onDelete: 'cascade' }),
+    tripItineraryId: uuid('trip_itinerary_id').notNull().references(() => tripItineraries.id, { onDelete: 'cascade' }),
+    // Images
+    receiptUrl: text('receipt_url'),
+    productImageUrl: text('product_image_url'),
+    // Soft Delete
+    isDeleted: boolean('is_delete').default(false).notNull(),
+    deletedAt: timestamp('deleted_at'),
+    order: integer('order').default(0),
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
@@ -133,129 +185,7 @@ export const budgets = pgTable('budgets', {
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
 
-// Relations
-export const usersRelations = relations(users, ({ many, one }) => ({
-    sessions: many(sessions),
-    accounts: many(accounts),
-    categories: many(categories),
-    transactions: many(transactions),
-    budgets: many(budgets),
-    survey: one(userSurveys, {
-        fields: [users.id],
-        references: [userSurveys.userId],
-    }),
-}));
-
-export const userSurveysRelations = relations(userSurveys, ({ one }) => ({
-    user: one(users, {
-        fields: [userSurveys.userId],
-        references: [users.id],
-    }),
-}));
-
-export const sessionsRelations = relations(sessions, ({ one }) => ({
-    user: one(users, {
-        fields: [sessions.userId],
-        references: [users.id],
-    }),
-}));
-
-export const accountsRelations = relations(accounts, ({ one }) => ({
-    user: one(users, {
-        fields: [accounts.userId],
-        references: [users.id],
-    }),
-}));
-
-export const categoriesRelations = relations(categories, ({ one, many }) => ({
-    user: one(users, {
-        fields: [categories.userId],
-        references: [users.id],
-    }),
-    transactions: many(transactions),
-    budgets: many(budgets),
-}));
-
-export const transactionsRelations = relations(transactions, ({ one }) => ({
-    user: one(users, {
-        fields: [transactions.userId],
-        references: [users.id],
-    }),
-    category: one(categories, {
-        fields: [transactions.categoryId],
-        references: [categories.id],
-    }),
-    trip: one(trips, {
-        fields: [transactions.tripId],
-        references: [trips.id],
-    }),
-    itinerary: one(tripItineraries, {
-        fields: [transactions.tripItineraryId],
-        references: [tripItineraries.id],
-    }),
-}));
-
-export const budgetsRelations = relations(budgets, ({ one }) => ({
-    user: one(users, {
-        fields: [budgets.userId],
-        references: [users.id],
-    }),
-    category: one(categories, {
-        fields: [budgets.categoryId],
-        references: [categories.id],
-    }),
-}));
-
-// Type exports
-export type User = typeof users.$inferSelect;
-export type NewUser = typeof users.$inferInsert;
-export type Category = typeof categories.$inferSelect;
-export type NewCategory = typeof categories.$inferInsert;
-export type Transaction = typeof transactions.$inferSelect;
-export type NewTransaction = typeof transactions.$inferInsert;
-export type Budget = typeof budgets.$inferSelect;
-export type NewBudget = typeof budgets.$inferInsert;
-export type UserSurvey = typeof userSurveys.$inferSelect;
-export type NewUserSurvey = typeof userSurveys.$inferInsert;
-// Friends table
-export const friends = pgTable('friends', {
-    id: uuid('id').primaryKey().defaultRandom(),
-    userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }), // The user who added the friend
-    friendUserId: text('friend_user_id').references(() => users.id), // Optional: link to actual user if they exist
-    name: text('name').notNull(), // Nickname or real name
-    email: text('email'), // Optional email for inviting
-    createdAt: timestamp('created_at').notNull().defaultNow(),
-    updatedAt: timestamp('updated_at').notNull().defaultNow(),
-});
-
-// Trips table
-export const trips = pgTable('trips', {
-    id: uuid('id').primaryKey().defaultRandom(),
-    name: text('name').notNull(), // WhereTo
-    destination: text('destination'),
-    imageUrl: text('image_url'),
-    startDate: timestamp('start_date').notNull(),
-    endDate: timestamp('end_date'),
-    description: text('description'),
-    notes: text('notes'), // General notes for the trip
-    userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }), // Creator
-    createdAt: timestamp('created_at').notNull().defaultNow(),
-    updatedAt: timestamp('updated_at').notNull().defaultNow(),
-});
-
-// Trip Itineraries (Days)
-export const tripItineraries = pgTable('trip_itineraries', {
-    id: uuid('id').primaryKey().defaultRandom(),
-    tripId: uuid('trip_id').notNull().references(() => trips.id, { onDelete: 'cascade' }),
-    dayNumber: integer('day_number').notNull(),
-    date: timestamp('date'),
-    title: text('title'), // Place visited or Title
-    description: text('description'), // Notes
-    location: text('location'),
-    links: text('links'), // Simplified to text for now, could be JSON
-    createdAt: timestamp('created_at').notNull().defaultNow(),
-    updatedAt: timestamp('updated_at').notNull().defaultNow(),
-});
+// ... (existing relations code) ...
 
 // Itinerary Notes
 export const itineraryNotes = pgTable('itinerary_notes', {
@@ -263,6 +193,7 @@ export const itineraryNotes = pgTable('itinerary_notes', {
     tripItineraryId: uuid('trip_itinerary_id').notNull().references(() => tripItineraries.id, { onDelete: 'cascade' }),
     content: text('content').notNull(),
     isHighPriority: boolean('is_high_priority').default(false),
+    order: integer('order').default(0),
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
@@ -273,8 +204,18 @@ export const itineraryChecklists = pgTable('itinerary_checklists', {
     tripItineraryId: uuid('trip_itinerary_id').notNull().references(() => tripItineraries.id, { onDelete: 'cascade' }),
     title: text('title').notNull(),
     items: text('items').default('[]'), // JSON array of checklist items
+    order: integer('order').default(0),
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
+// Friends table
+export const friends = pgTable('friends', {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    friendId: text('friend_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    status: text('status', { enum: ['pending', 'accepted'] }).default('pending'),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
 });
 
 // Trip Invites
@@ -300,7 +241,8 @@ export const tripsRelations = relations(trips, ({ one, many }) => ({
         references: [users.id],
     }),
     itineraries: many(tripItineraries),
-    transactions: many(transactions),
+    // transactions: many(transactions), // Legacy, migrated to tripTransactions
+    tripTransactions: many(tripTransactions),
     invites: many(tripInvites),
 }));
 
@@ -311,7 +253,8 @@ export const tripItinerariesRelations = relations(tripItineraries, ({ one, many 
     }),
     notes: many(itineraryNotes),
     checklists: many(itineraryChecklists),
-    transactions: many(transactions),
+    // transactions: many(transactions), // Legacy
+    tripTransactions: many(tripTransactions),
 }));
 
 export const itineraryNotesRelations = relations(itineraryNotes, ({ one }) => ({
@@ -336,4 +279,48 @@ export const tripInvitesRelations = relations(tripInvites, ({ one }) => ({
 }));
 
 // Update transactions relations in existing code to include trip
-// (This needs to be merged with existing transactionsRelations or handled by the user)
+export const transactionsRelations = relations(transactions, ({ one }) => ({
+    user: one(users, {
+        fields: [transactions.userId],
+        references: [users.id],
+    }),
+    category: one(categories, {
+        fields: [transactions.categoryId],
+        references: [categories.id],
+    }),
+    trip: one(trips, {
+        fields: [transactions.tripId],
+        references: [trips.id],
+    }),
+    itinerary: one(tripItineraries, {
+        fields: [transactions.tripItineraryId],
+        references: [tripItineraries.id],
+    }),
+}));
+
+export const tripTransactionsRelations = relations(tripTransactions, ({ one }) => ({
+    user: one(users, {
+        fields: [tripTransactions.userId],
+        references: [users.id],
+    }),
+    category: one(categories, {
+        fields: [tripTransactions.categoryId],
+        references: [categories.id],
+    }),
+    trip: one(trips, {
+        fields: [tripTransactions.tripId],
+        references: [trips.id],
+    }),
+    itinerary: one(tripItineraries, {
+        fields: [tripTransactions.tripItineraryId],
+        references: [tripItineraries.id],
+    }),
+}));
+
+export type Transaction = typeof transactions.$inferSelect;
+export type Category = typeof categories.$inferSelect;
+export type User = typeof users.$inferSelect;
+export type Trip = typeof trips.$inferSelect;
+export type TripItinerary = typeof tripItineraries.$inferSelect;
+export type TripTransaction = typeof tripTransactions.$inferSelect;
+export type Budget = typeof budgets.$inferSelect;

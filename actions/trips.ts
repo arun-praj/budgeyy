@@ -1,9 +1,9 @@
 'use server';
 
 import { db } from '@/db';
-import { trips } from '@/db/schema';
+import { trips, tripTransactions } from '@/db/schema';
 import * as schema from '@/db/schema';
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc, and } from 'drizzle-orm';
 import { auth } from '@/lib/auth';
 import { headers } from 'next/headers';
 import { revalidatePath } from 'next/cache';
@@ -147,8 +147,8 @@ export async function getTrip(tripId: string) {
             itineraries: {
                 orderBy: (itineraries, { asc }) => [asc(itineraries.dayNumber)],
                 with: {
-                    transactions: {
-                        where: (transactions, { eq }) => eq(transactions.isDeleted, false)
+                    tripTransactions: {
+                        where: (utils, { eq }) => eq(utils.isDeleted, false)
                     },
                     notes: true,
                     checklists: true,
@@ -252,6 +252,23 @@ export async function createItineraryChecklist(itineraryId: string, title: strin
     revalidatePath('/splitlog/[tripId]');
 }
 
+export async function updateItineraryChecklist(checklistId: string, items: string) {
+    const session = await auth.api.getSession({
+        headers: await headers()
+    });
+
+    if (!session?.user) throw new Error('Unauthorized');
+
+    await db.update(schema.itineraryChecklists)
+        .set({
+            items,
+            updatedAt: new Date()
+        })
+        .where(eq(schema.itineraryChecklists.id, checklistId));
+
+    revalidatePath('/splitlog/[tripId]');
+}
+
 export async function deleteItineraryNote(noteId: string) {
     const session = await auth.api.getSession({
         headers: await headers()
@@ -285,12 +302,66 @@ export async function deleteTripTransaction(transactionId: string) {
 
     if (!session?.user) throw new Error('Unauthorized');
 
-    await db.update(schema.transactions)
+    await db.update(schema.tripTransactions)
         .set({
             isDeleted: true,
             deletedAt: new Date()
         })
-        .where(eq(schema.transactions.id, transactionId));
+        .where(eq(schema.tripTransactions.id, transactionId));
 
     revalidatePath('/splitlog/[tripId]');
+}
+
+export async function createTripTransaction(data: {
+    tripId: string;
+    tripItineraryId: string;
+    amount: number;
+    date: Date;
+    type: 'income' | 'expense' | 'savings';
+    categoryId?: string;
+    description?: string;
+    isCredit?: boolean;
+    order?: number;
+}) {
+    const session = await auth.api.getSession({
+        headers: await headers()
+    });
+
+    if (!session?.user?.id) throw new Error('Unauthorized');
+
+    const [transaction] = await db.insert(schema.tripTransactions).values({
+        ...data,
+        amount: data.amount.toString(),
+        userId: session.user.id,
+    }).returning();
+
+    revalidatePath('/splitlog/[tripId]');
+    return transaction;
+}
+
+export async function updateTripTransaction(id: string, data: {
+    amount?: number;
+    date?: Date;
+    type?: 'income' | 'expense' | 'savings';
+    categoryId?: string;
+    description?: string;
+    isCredit?: boolean;
+}) {
+    const session = await auth.api.getSession({
+        headers: await headers()
+    });
+
+    if (!session?.user?.id) throw new Error('Unauthorized');
+
+    const [transaction] = await db.update(schema.tripTransactions)
+        .set({
+            ...data,
+            amount: data.amount ? data.amount.toString() : undefined,
+            updatedAt: new Date()
+        })
+        .where(eq(schema.tripTransactions.id, id))
+        .returning();
+
+    revalidatePath('/splitlog/[tripId]');
+    return transaction;
 }

@@ -2,7 +2,7 @@
 
 import { db } from '@/db';
 import { transactions, categories } from '@/db/schema';
-import { eq, and, gte, lte, desc, sql } from 'drizzle-orm';
+import { eq, and, gte, lte, desc, sql, isNull } from 'drizzle-orm';
 import { auth } from '@/lib/auth';
 import { headers } from 'next/headers';
 import { revalidatePath } from 'next/cache';
@@ -123,7 +123,8 @@ export async function getTransactions(options: {
 
     const conditions = [
         eq(transactions.userId, session.user.id),
-        eq(transactions.isDeleted, false)
+        eq(transactions.isDeleted, false),
+        isNull(transactions.tripId)
     ];
     if (options.start) conditions.push(gte(transactions.date, options.start));
     if (options.end) conditions.push(lte(transactions.date, options.end));
@@ -183,6 +184,7 @@ export async function getDashboardStats({ start, end }: { start: Date; end: Date
         where: and(
             eq(transactions.userId, session.user.id),
             eq(transactions.isDeleted, false),
+            isNull(transactions.tripId),
             gte(transactions.date, start),
             lte(transactions.date, end)
         ),
@@ -363,7 +365,8 @@ export async function getCalendarStats(start: Date, end: Date) {
         where: and(
             eq(transactions.userId, session.user.id),
             eq(transactions.isDeleted, false),
-            gte(transactions.date, start),// Use a unique marker if needed, or just match context
+            isNull(transactions.tripId),
+            gte(transactions.date, start),
             lte(transactions.date, end)
         ),
     });
@@ -443,6 +446,7 @@ export async function getBudgetReportData(start: Date, end: Date) {
         where: and(
             eq(transactions.userId, session.user.id),
             eq(transactions.isDeleted, false),
+            isNull(transactions.tripId),
             gte(transactions.date, start),
             lte(transactions.date, end)
         ),

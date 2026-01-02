@@ -71,8 +71,8 @@ export default async function TripDetailsPage(props: TripDetailsPageProps) {
                         <div className="flex items-center text-muted-foreground">
                             <Calendar className="h-4 w-4 mr-2" />
                             <span>
-                                {format(trip.startDate, 'MMM d')}
-                                {trip.endDate ? ` - ${format(trip.endDate, 'MMM d, yyyy')}` : `, ${format(trip.startDate, 'yyyy')}`}
+                                {trip.startDate ? format(trip.startDate, 'MMM d') : 'No Date'}
+                                {trip.endDate ? ` - ${format(trip.endDate, 'MMM d, yyyy')}` : (trip.startDate ? `, ${format(trip.startDate, 'yyyy')}` : '')}
                             </span>
                         </div>
                     </div>
@@ -161,7 +161,7 @@ export default async function TripDetailsPage(props: TripDetailsPageProps) {
                                 </Button>
                             </div>
 
-                            <ItineraryTimeline items={trip.itineraries} />
+                            <ItineraryTimeline items={trip.itineraries} tripId={trip.id} />
                         </TabsContent>
 
                         <TabsContent value="expenses">
