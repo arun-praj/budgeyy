@@ -7,6 +7,40 @@ import { eq, desc, and, inArray, gt, sql, lte } from 'drizzle-orm';
 import { auth } from '@/lib/auth';
 import { headers } from 'next/headers';
 import { revalidatePath } from 'next/cache';
+import { v4 as uuidv4 } from 'uuid';
+
+/**
+ * Ensures a user exists for the given email.
+ * If not, creates a "Shadow User" with isGuest = true.
+ */
+async function ensureShadowUser(email: string, name?: string, avatar?: string) {
+    const normalizeEmail = email.toLowerCase();
+
+    // Check if user exists
+    const existingUser = await db.query.users.findFirst({
+        where: eq(schema.users.email, normalizeEmail)
+    });
+
+    if (existingUser) return existingUser.id;
+
+    // Create Shadow User
+    const newId = uuidv4(); // Use UUID for consistency with better-auth if possible, or nanoid. Schema says text. 
+    // better-auth usually generates random strings. Let's start with a random string.
+    // Actually schema definition is text('id').primaryKey().
+    // We will generate a UUID.
+
+    const [newUser] = await db.insert(schema.users).values({
+        id: newId,
+        email: normalizeEmail,
+        name: name || normalizeEmail.split('@')[0],
+        image: null,
+        avatar: avatar, // Save guest avatar config here
+        isGuest: true,
+        emailVerified: false,
+    }).returning({ id: schema.users.id });
+
+    return newUser.id;
+}
 
 export async function getTrips() {
     const session = await auth.api.getSession({
@@ -58,6 +92,7 @@ export async function createTrip(data: {
     const invitesToProcess = data.invites || (data.emails ? data.emails.map(e => ({ email: e, guestAvatar: undefined })) : []);
 
     if (invitesToProcess.length > 0) {
+        // 1. Create Invites Records (Keep for tracking status)
         await db.insert(schema.tripInvites).values(
             invitesToProcess.map(invite => ({
                 tripId: newTrip.id,
@@ -66,6 +101,11 @@ export async function createTrip(data: {
                 guestAvatar: invite.guestAvatar,
             }))
         );
+
+        // 2. Ensure Shadow Users for all invitees
+        for (const invite of invitesToProcess) {
+            await ensureShadowUser(invite.email, undefined, invite.guestAvatar);
+        }
     }
 
     // Auto-generate itinerary days
@@ -430,9 +470,7 @@ export async function createTripTransaction(data: {
 
     // Fallback logic if payers array is empty
     if (finalPayers.length === 0) {
-        if (data.paidByGuestId) {
-            finalPayers = [{ guestId: data.paidByGuestId, amount: data.amount }];
-        } else if (data.paidByUserId) {
+        if (data.paidByUserId) {
             finalPayers = [{ userId: data.paidByUserId, amount: data.amount }];
         } else {
             // Default to creator if absolutely no info
@@ -447,15 +485,14 @@ export async function createTripTransaction(data: {
             amount: data.amount.toString(),
             userId: session.user.id,
             paidByUserId: finalPayers[0]?.userId || null,
-            paidByGuestId: finalPayers[0]?.guestId || null,
+            paidByGuestId: null, // No longer used
         }).returning();
 
         if (data.splits && data.splits.length > 0) {
             await tx.insert(schema.tripTransactionSplits).values(
                 data.splits.map(split => ({
                     tripTransactionId: transaction.id,
-                    userId: split.userId || null,
-                    guestId: split.guestId || null,
+                    userId: split.userId!,
                     amount: split.amount.toString(),
                 }))
             );
@@ -465,8 +502,7 @@ export async function createTripTransaction(data: {
             await tx.insert(schema.tripTransactionPayers).values(
                 finalPayers.map(payer => ({
                     tripTransactionId: transaction.id,
-                    userId: payer.userId || null,
-                    guestId: payer.guestId || null,
+                    userId: payer.userId!,
                     amount: payer.amount.toString(),
                 }))
             );
@@ -507,7 +543,6 @@ export async function updateTripTransaction(id: string, data: {
 
         // Update legacy paidBy columns if implicit in single-payer update
         if (data.paidByUserId !== undefined) updateData.paidByUserId = data.paidByUserId;
-        if (data.paidByGuestId !== undefined) updateData.paidByGuestId = data.paidByGuestId;
 
         const [transaction] = await tx.update(schema.tripTransactions)
             .set(updateData)
@@ -523,8 +558,7 @@ export async function updateTripTransaction(id: string, data: {
                 await tx.insert(schema.tripTransactionSplits).values(
                     data.splits.map(split => ({
                         tripTransactionId: id,
-                        userId: split.userId || null,
-                        guestId: split.guestId || null,
+                        userId: split.userId!,
                         amount: split.amount.toString(),
                     }))
                 );

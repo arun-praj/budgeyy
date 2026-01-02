@@ -35,7 +35,21 @@ export default async function TripDetailsPage(props: TripDetailsPageProps) {
     });
     const trip = await getTrip(params.tripId);
 
-    if (!trip || !session?.user) {
+    // Fetch full user to get currency preference (session might be stale or partial)
+    let currentUser = session?.user;
+    if (session?.user?.id) {
+        const dbUser = await db.query.users.findFirst({
+            where: eq(users.id, session.user.id)
+        });
+        if (dbUser) {
+            currentUser = {
+                ...dbUser,
+                name: dbUser.name || session.user.name || 'User' // Ensure name is never null
+            };
+        }
+    }
+
+    if (!trip || !currentUser) {
         notFound();
     }
 
@@ -95,19 +109,31 @@ export default async function TripDetailsPage(props: TripDetailsPageProps) {
         const registeredUser = memberUsersMap.get(email);
         if (registeredUser) {
             if (registeredUser.id !== trip.userId) {
+                // Determine if they are effectively a guest (shadow user)
+                // A shadow user isGuest=true in DB.
+                const isGuestRole = registeredUser.isGuest;
+
                 memberUsers.push({
                     ...registeredUser,
-                    image: registeredUser.avatar, // Map avatar to image for consistency
-                    isGuest: false
+                    image: registeredUser.avatar || (registeredUser.image?.startsWith('{') ? registeredUser.image : null), // Map avatar (or fallback to image if legacy JSON) to image prop
+                    isGuest: isGuestRole || false
                 });
                 addedEmails.add(email);
             }
-        } else {
-            // It's a Guest!
-            // Use invite.id as the ID for keys/db references
+        }
+        // If no registered user found, that's an issue with sync (since we ensureShadowUser on create).
+        // specific fallback not needed if backend guarantees user.
+        // But for safety/legacy invites that might exist before migration:
+        else {
             memberUsers.push({
-                id: invite.id, // Use Invite UUID
-                name: email.split('@')[0], // Fallback name
+                id: invite.id, // This is technically wrong if we want userId, but for legacy fallback ok. 
+                // Ideally we should start migrating. 
+                // But for now, let's assume getTrip includes users properly.
+                // Actually getTrip logic doesn't eagerly load "Shadow Users" unless they are in `invitedUsers` query.
+                // The `invitedUsers` query fetches by email. Shadow users HAVE the email.
+                // So `registeredUser` SHOULD be found.
+                // So this else block should rarely be hit if data is clean.
+                name: email.split('@')[0],
                 email: email,
                 image: invite.guestAvatar || null,
                 isGuest: true
@@ -251,7 +277,7 @@ export default async function TripDetailsPage(props: TripDetailsPageProps) {
                                 items={trip.itineraries}
                                 tripId={trip.id}
                                 members={memberUsers}
-                                currentUser={session.user}
+                                currentUser={currentUser}
                                 startDate={trip.startDate}
                                 endDate={trip.endDate}
                             />

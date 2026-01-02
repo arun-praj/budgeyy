@@ -202,11 +202,7 @@ export function ItineraryTimeline({ items, categories = [], tripId, members = []
                 payers = payerIds.map(id => {
                     const val = parseFloat(multiPayerAmounts[id] || '0');
                     totalPaid += val;
-                    if (isGuest(id)) {
-                        return { guestId: id, amount: val };
-                    } else {
-                        return { userId: id, amount: val };
-                    }
+                    return { userId: id, amount: val };
                 });
 
                 if (Math.abs(totalPaid - amount) > 0.01) {
@@ -221,11 +217,7 @@ export function ItineraryTimeline({ items, categories = [], tripId, members = []
                     return;
                 }
                 const pAmnt = amount;
-                if (isGuest(payerId)) {
-                    payers = [{ guestId: payerId, amount: pAmnt }];
-                } else {
-                    payers = [{ userId: payerId, amount: pAmnt }];
-                }
+                payers = [{ userId: payerId, amount: pAmnt }];
             }
 
             let splits: { userId?: string; guestId?: string; amount: number }[] = [];
@@ -233,14 +225,12 @@ export function ItineraryTimeline({ items, categories = [], tripId, members = []
             if (splitType === 'equal') {
                 const share = amount / members.length;
                 splits = members.map(m => {
-                    if (m.isGuest) return { guestId: m.id, amount: share };
                     return { userId: m.id, amount: share };
                 });
             } else if (splitType === 'specific') {
                 if (selectedSplitUsers.length > 0) {
                     const share = amount / selectedSplitUsers.length;
                     splits = selectedSplitUsers.map(id => {
-                        if (isGuest(id)) return { guestId: id, amount: share };
                         return { userId: id, amount: share };
                     });
                 }
@@ -251,9 +241,13 @@ export function ItineraryTimeline({ items, categories = [], tripId, members = []
 
             if (editingTransactionId) {
                 // UPDATE
+                // For updates, we usually want to preserve the date unless we add date editing UI.
+                // For now, if we're just re-submitting, we'll keep the date logic consistent.
+                const originalDate = activeItem?.date ? new Date(activeItem.date) : new Date();
+
                 await updateTripTransaction(editingTransactionId, {
                     amount: amount,
-                    date: activeItem?.date ? activeItem.date : new Date(), // Keep date logic or allow date edit? simplified for now
+                    date: originalDate, // Still simplified, but clearer than relying on fallback logic inside call
                     description: expenseDesc || 'Trip Expense',
                     type: 'expense',
                     categoryId: expenseCategory || undefined,
@@ -264,10 +258,17 @@ export function ItineraryTimeline({ items, categories = [], tripId, members = []
                 });
                 toast.success('Expense updated');
             } else {
-                // CREATE
+                // For new transactions, use the itinerary day's date but the current time
+                // This ensures it falls on the correct day but shows 'now' in the timeline
+                const now = new Date();
+                const transactionDate = activeItem?.date ? new Date(activeItem.date) : now;
+                if (activeItem?.date) {
+                    transactionDate.setHours(now.getHours(), now.getMinutes(), now.getSeconds());
+                }
+
                 await createTripTransaction({
                     amount: amount,
-                    date: activeItem?.date ? activeItem.date : new Date(),
+                    date: transactionDate,
                     description: expenseDesc || 'Trip Expense',
                     type: 'expense',
                     categoryId: expenseCategory || undefined,
@@ -305,21 +306,20 @@ export function ItineraryTimeline({ items, categories = [], tripId, members = []
                 setIsMultiPayer(true);
                 const amounts: Record<string, string> = {};
                 transaction.payers.forEach((p: any) => {
-                    const id = p.userId || (p.guestId ? `guest_${p.guestId}` : '');
+                    const id = p.userId;
                     if (id) amounts[id] = p.amount;
                 });
                 setMultiPayerAmounts(amounts);
             } else {
                 setIsMultiPayer(false);
                 const p = transaction.payers[0];
-                const id = p.userId || (p.guestId ? `guest_${p.guestId}` : '');
+                const id = p.userId;
                 if (id) setPayerId(id);
             }
         } else {
             // Legacy fallback
             setIsMultiPayer(false);
             if (transaction.paidByUserId) setPayerId(transaction.paidByUserId);
-            else if (transaction.paidByGuestId) setPayerId(`guest_${transaction.paidByGuestId}`);
         }
 
         // Set Splits
@@ -331,7 +331,7 @@ export function ItineraryTimeline({ items, categories = [], tripId, members = []
             // Or 'equal' with all users.
 
             // Check if all members are in splits
-            const splitUserIds = transaction.splits.map((s: any) => s.userId || (s.guestId ? `guest_${s.guestId}` : ''));
+            const splitUserIds = transaction.splits.map((s: any) => s.userId);
             setSelectedSplitUsers(splitUserIds.filter(Boolean));
 
             if (splitUserIds.length === members.length) {
@@ -530,7 +530,7 @@ export function ItineraryTimeline({ items, categories = [], tripId, members = []
                             <div className="flex-1 pb-10 relative">
 
                                 {/* Header: Date + Title Block */}
-                                <div className="flex flex-col gap-1 mb-4 h-auto min-h-[40px] pl-3">
+                                <div className="flex flex-col gap-1 mb-2 h-auto min-h-[40px] pl-3">
                                     <h3 className="text-lg font-bold text-foreground leading-none shrink-0">
                                         {item.date ? format(new Date(item.date), 'EEEE, MMMM do') : `Day ${item.dayNumber}`}
                                     </h3>
@@ -639,7 +639,7 @@ export function ItineraryTimeline({ items, categories = [], tripId, members = []
                                                                             return s.user ? (s.user.name || s.user.email.split('@')[0]) : 'Unknown';
                                                                         });
 
-                                                                        if (splitNames.length === members.length && members.length > 3) {
+                                                                        if (splitNames.length === members.length) {
                                                                             splitText = 'everyone';
                                                                         } else {
                                                                             if (splitNames.length === 1) splitText = splitNames[0];
@@ -758,8 +758,9 @@ export function ItineraryTimeline({ items, categories = [], tripId, members = []
                                         </div>
                                     )}
                                 </Droppable>
-                                {/* Quick Add Toolbar - Permanent Branch */}
-                                <div className="relative group/item mt-2 opacity-70 hover:opacity-100 transition-opacity focus-within:opacity-100 pb-2">
+
+                                {/* Quick Add Toolbar - Left Aligned, Upgraded */}
+                                <div className="relative group/item -mt-3 opacity-70 hover:opacity-100 transition-opacity focus-within:opacity-100 pb-2">
                                     {/* Connector - Shortened */}
                                     <div className="absolute -left-10 top-0 h-[13px] w-10 border-b-2 border-l-2 border-gray-200 dark:border-gray-800 rounded-bl-xl" />
 
@@ -769,56 +770,35 @@ export function ItineraryTimeline({ items, categories = [], tripId, members = []
                                             <div className="h-2 w-2 rounded-full bg-current" />
                                         </div>
 
-                                        {/* Input & Actions Container - Separated */}
-                                        <div className="flex-1 flex items-center gap-3">
-                                            <Input
-                                                placeholder="Add a place..."
-                                                className="flex-1 h-10 bg-transparent border-transparent hover:bg-muted/30 focus:bg-muted/30 focus:border-input transition-colors rounded-lg shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 placeholder:text-muted-foreground/50"
-                                                onKeyDown={async (e) => {
-                                                    if (e.key === 'Enter') {
-                                                        const val = e.currentTarget.value.trim();
-                                                        if (val) {
-                                                            await createItineraryNote(item.id, val);
-                                                            e.currentTarget.value = '';
-                                                            toast.success('Added');
-                                                        }
-                                                    }
-                                                }}
-                                            />
-
-                                            {/* Separator */}
-                                            <div className="h-6 w-px bg-border/50 hidden sm:block" />
-
-                                            {/* Action Icons - Larger, Circular, Separate */}
-                                            <div className="flex items-center gap-2">
-                                                <Button
-                                                    variant="outline"
-                                                    size="icon"
-                                                    className="h-9 w-9 rounded-full bg-background border shadow-sm text-muted-foreground hover:text-emerald-600 hover:border-emerald-200 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-all"
-                                                    onClick={() => handleCreateNote(item.id)}
-                                                    title="Add Note"
-                                                >
-                                                    <StickyNote className="h-4 w-4" />
-                                                </Button>
-                                                <Button
-                                                    variant="outline"
-                                                    size="icon"
-                                                    className="h-9 w-9 rounded-full bg-background border shadow-sm text-muted-foreground hover:text-emerald-600 hover:border-emerald-200 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-all"
-                                                    onClick={() => handleOpenDialog('checklist', item.id, item.tripId)}
-                                                    title="Add Checklist"
-                                                >
-                                                    <CheckSquare className="h-4 w-4" />
-                                                </Button>
-                                                <Button
-                                                    variant="outline"
-                                                    size="icon"
-                                                    className="h-9 w-9 rounded-full bg-background border shadow-sm text-muted-foreground hover:text-emerald-600 hover:border-emerald-200 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-all"
-                                                    onClick={() => handleOpenDialog('expense', item.id, item.tripId)}
-                                                    title="Add Expense"
-                                                >
-                                                    <DollarSign className="h-4 w-4" />
-                                                </Button>
-                                            </div>
+                                        {/* Action Icons - Reverted to left-aligned */}
+                                        <div className="flex items-center gap-2">
+                                            <Button
+                                                variant="outline"
+                                                size="icon"
+                                                className="h-9 w-9 rounded-full bg-background border shadow-sm text-muted-foreground hover:text-emerald-600 hover:border-emerald-200 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-all"
+                                                onClick={() => handleCreateNote(item.id)}
+                                                title="Add Note"
+                                            >
+                                                <StickyNote className="h-4 w-4" />
+                                            </Button>
+                                            <Button
+                                                variant="outline"
+                                                size="icon"
+                                                className="h-9 w-9 rounded-full bg-background border shadow-sm text-muted-foreground hover:text-emerald-600 hover:border-emerald-200 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-all"
+                                                onClick={() => handleOpenDialog('checklist', item.id, item.tripId)}
+                                                title="Add Checklist"
+                                            >
+                                                <CheckSquare className="h-4 w-4" />
+                                            </Button>
+                                            <Button
+                                                variant="outline"
+                                                size="icon"
+                                                className="h-9 w-9 rounded-full bg-background border shadow-sm text-muted-foreground hover:text-emerald-600 hover:border-emerald-200 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-all"
+                                                onClick={() => handleOpenDialog('expense', item.id, item.tripId)}
+                                                title="Add Expense"
+                                            >
+                                                <DollarSign className="h-4 w-4" />
+                                            </Button>
                                         </div>
                                     </div>
                                 </div>
@@ -1070,8 +1050,8 @@ export function ItineraryTimeline({ items, categories = [], tripId, members = []
                         </DialogFooter>
                     </DialogContent>
                 </Dialog>
-            </div >
-        </DragDropContext >
+            </div>
+        </DragDropContext>
     );
 }
 
