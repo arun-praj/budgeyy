@@ -13,11 +13,18 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+import { SyncProvider } from "@/components/providers/sync-provider";
+
+export const viewport = {
+  themeColor: "#000000",
+};
+
 export const metadata: Metadata = {
   title: {
     default: "Budgeyy - Personal Finance Mastered",
     template: "%s | Budgeyy"
   },
+  manifest: "/manifest.json",
   description: "Master your finances with the 50/30/20 rule. Track income, expenses, and savings with beautiful visualizations and localized Nepali calendar support.",
   keywords: ["budget", "finance", "expense tracker", "50/30/20 rule", "savings", "nepali calendar", "personal finance"],
   openGraph: {
@@ -36,6 +43,7 @@ export const metadata: Metadata = {
 };
 
 import { ThemeSyncer } from "@/components/providers/theme-syncer";
+import { ServiceWorkerRegister } from "@/components/service-worker-register";
 import { getUserSettings } from "@/actions/user";
 
 import { Suspense } from "react";
@@ -59,7 +67,10 @@ export default function RootLayout({
           <Suspense fallback={null}>
             <ConnectedThemeSyncer />
           </Suspense>
-          {children}
+          <SyncProvider>
+            {children}
+            <ServiceWorkerRegister />
+          </SyncProvider>
         </ThemeProvider>
       </body>
     </html>

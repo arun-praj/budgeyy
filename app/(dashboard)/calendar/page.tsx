@@ -1,5 +1,7 @@
 import { getCalendarStats } from '@/actions/transactions';
 import { getUserSettings } from '@/actions/user';
+import { getCalendarPageRange } from '@/lib/date-utils';
+
 import { CalendarGrid } from '@/components/calendar/calendar-grid';
 import { CalendarHeader } from '@/components/calendar/calendar-header';
 
@@ -30,30 +32,19 @@ async function CalendarContent({ searchParams }: { searchParams: Promise<{ [key:
     const dateParam = params.date as string;
     const currentDate = dateParam ? new Date(dateParam) : new Date();
 
-    const [stats, userSettings] = await Promise.all([
-        // reusing logic below for stats fetch, but need to move date calc up or dup it
-        // actually easier to just wait for date calc
-        Promise.resolve(null), // placeholder
+    const [userSettings] = await Promise.all([
         getUserSettings(),
     ]);
 
+    const currency = userSettings?.currency || 'USD';
+    const calendar = userSettings?.calendarPreference || 'gregorian';
+
     // Calculate range for the calendar fetch (full month + buffers)
-    const d = new Date(currentDate);
-    const startOfMonth = new Date(d.getFullYear(), d.getMonth(), 1);
-    const endOfMonth = new Date(d.getFullYear(), d.getMonth() + 1, 0);
-
-    const startDate = new Date(startOfMonth);
-    startDate.setDate(startDate.getDate() - startDate.getDay()); // Start on Sunday buffer
-
-    const endDate = new Date(endOfMonth);
-    const daysToAdd = 6 - endDate.getDay(); // End on Saturday buffer
-    endDate.setDate(endDate.getDate() + daysToAdd);
-    endDate.setHours(23, 59, 59, 999);
+    const { start: startDate, end: endDate } = getCalendarPageRange(currentDate, calendar);
 
     const realStats = await getCalendarStats(startDate, endDate);
 
-    const currency = userSettings?.currency || 'USD';
-    const calendar = userSettings?.calendarPreference || 'gregorian';
+
 
     return (
         <>

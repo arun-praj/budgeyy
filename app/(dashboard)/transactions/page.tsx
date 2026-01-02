@@ -1,5 +1,6 @@
 import { getTransactions, getCategories } from '@/actions/transactions';
 import { getUserSettings } from '@/actions/user';
+import { getRangeDates } from '@/lib/date-utils';
 import { TransactionFormSheet } from '@/components/transactions/transaction-form-sheet';
 import { TransactionsList } from '@/components/transactions/transactions-list';
 import { TransactionFilters } from '@/components/transactions/transaction-filters';
@@ -76,33 +77,18 @@ async function TransactionsContent({ searchParams }: { searchParams: Promise<{ [
 
     const range = typeof params.range === 'string' ? params.range : 'this-month';
 
-    // Calculate Date Range
-    const today = new Date();
-    let start: Date | undefined;
-    let end: Date | undefined;
+    // Fetch user settings first to get calendar preference
+    const userSettings = await getUserSettings();
+    const currency = userSettings?.currency || 'USD';
+    const calendar = userSettings?.calendarPreference || 'gregorian';
 
-    if (range === 'this-month') {
-        start = new Date(today.getFullYear(), today.getMonth(), 1);
-        end = new Date(today.getFullYear(), today.getMonth() + 1, 0, 23, 59, 59, 999);
-    } else {
-        end = new Date(today);
-        end.setHours(23, 59, 59, 999);
-        start = new Date(today);
-        start.setHours(0, 0, 0, 0);
-
-        if (range === '3m') {
-            start.setMonth(start.getMonth() - 3);
-        } else if (range === '6m') {
-            start.setMonth(start.getMonth() - 6);
-        } else if (range === '1y') {
-            start.setFullYear(start.getFullYear() - 1);
-        }
-    }
+    // Calculate Date Range based on calendar
+    const { start, end } = getRangeDates(range, calendar);
 
     const page = typeof params.page === 'string' ? parseInt(params.page) : 1;
     const pageSize = 20;
 
-    const [transactionsResult, userSettings, categories] = await Promise.all([
+    const [transactionsResult, categories] = await Promise.all([
         getTransactions({
             categoryId: categoryId === 'all' ? undefined : categoryId,
             type: validType,
@@ -111,14 +97,10 @@ async function TransactionsContent({ searchParams }: { searchParams: Promise<{ [
             page,
             pageSize,
         }),
-        getUserSettings(),
         getCategories(),
     ]);
 
     const { data: transactions, totalCount } = transactionsResult;
-
-    const currency = userSettings?.currency || 'USD';
-    const calendar = userSettings?.calendarPreference || 'gregorian';
 
     return (
         <>

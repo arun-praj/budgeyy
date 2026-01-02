@@ -69,7 +69,7 @@ async function DashboardHeader({ searchParams }: { searchParams: Promise<{ [key:
     const today = formatDate(new Date(), calendar, 'long');
 
     // Report data for download button
-    const { start, end } = getMonthRange(currentDate);
+    const { start, end } = getMonthRange(currentDate, calendar);
     // Optimization: Parallel fetch report data with user settings?
     // Let's just fetch report data here or pass it?
     // DownloadButton needs report data.
@@ -118,18 +118,19 @@ async function DashboardContent({ searchParams }: { searchParams: Promise<{ [key
     const dateParam = params.date as string;
     const currentDate = dateParam ? new Date(dateParam) : new Date(); // Re-parsing is cheap/fine
 
-    const { start, end } = getMonthRange(currentDate);
-
-    // Run fetches in parallel
-    const [stats, recentTransactions, userSettings, dailyStats] = await Promise.all([
-        getDashboardStats({ start, end }),
-        getTransactions({ limit: 5, start, end }),
-        getUserSettings(),
-        getCalendarStats(start, end),
-    ]);
-
+    // Fetch user settings first to get calendar preference
+    const userSettings = await getUserSettings();
     const currency = userSettings?.currency || 'USD';
     const calendar = userSettings?.calendarPreference || 'gregorian';
+
+    const { start, end } = getMonthRange(currentDate, calendar);
+
+    // Run fetches in parallel
+    const [stats, recentTransactions, dailyStats] = await Promise.all([
+        getDashboardStats({ start, end }),
+        getTransactions({ limit: 5, start, end }),
+        getCalendarStats(start, end),
+    ]);
     // Net Savings = Explicit Savings Transaction Amount Only
     const netSavings = stats.savingsAmount;
     // Balance = Income - Expenses - Savings (Remaining spendable)

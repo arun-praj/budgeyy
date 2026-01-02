@@ -150,6 +150,97 @@ export function getMonthRange(date: Date, calendar: CalendarSystem = 'gregorian'
 }
 
 /**
+ * Get date range for filters based on calendar preference
+ */
+export function getRangeDates(range: string, calendar: CalendarSystem = 'gregorian'): { start: Date; end: Date } {
+    const today = new Date();
+    let start: Date;
+    let end: Date = new Date(today);
+    end.setHours(23, 59, 59, 999);
+
+    if (calendar === 'nepali') {
+        try {
+            const currentNd = new NepaliDate(today);
+            const currentYear = currentNd.getYear();
+            const currentMonth = currentNd.getMonth(); // 0-11
+
+            if (range === 'this-month') {
+                const startNd = new NepaliDate(currentYear, currentMonth, 1);
+                start = startNd.toJsDate();
+                start.setHours(0, 0, 0, 0);
+
+                const endNd = new NepaliDate(currentYear, currentMonth + 1, 0);
+                end = endNd.toJsDate();
+                end.setHours(23, 59, 59, 999);
+                return { start, end };
+            }
+
+            // For lookback periods, end date is today (now)
+
+            if (range === '3m') {
+                // Go back 3 months from current month start? Or just 3 months relative?
+                // Typically "Last 3 Months" means [Start of Month - 3] to [Today] or [End of Month]
+                // Let's mimic the Gregorian logic: Start date is N months ago.
+                let targetMonth = currentMonth - 3;
+                let targetYear = currentYear;
+                while (targetMonth < 0) {
+                    targetMonth += 12;
+                    targetYear -= 1;
+                }
+
+                let startMonth = currentMonth;
+                let startYear = currentYear;
+
+                if (range === '3m') {
+                    startMonth -= 3;
+                } else if (range === '6m') {
+                    startMonth -= 6;
+                } else if (range === '1y') {
+                    startYear -= 1;
+                }
+
+                // Normalize
+                while (startMonth < 0) {
+                    startMonth += 12;
+                    startYear -= 1;
+                }
+
+                // Try to keep same day, cap at month end
+                const daysInTarget = getNepaliDaysInMonth(startYear, startMonth);
+                const day = Math.min(currentNd.getDate(), daysInTarget);
+
+                const startNd = new NepaliDate(startYear, startMonth, day);
+                start = startNd.toJsDate();
+                start.setHours(0, 0, 0, 0);
+
+                return { start, end };
+            }
+        } catch (e) {
+            console.error('Nepali date range calculation failed', e);
+            // Fallback to Gregorian
+        }
+    }
+
+    // Gregorian fallback or default
+    start = new Date(today);
+    start.setHours(0, 0, 0, 0);
+
+    if (range === 'this-month') {
+        start = new Date(today.getFullYear(), today.getMonth(), 1);
+        end = new Date(today.getFullYear(), today.getMonth() + 1, 0, 23, 59, 59, 999);
+    } else if (range === '3m') {
+        start.setMonth(start.getMonth() - 3);
+    } else if (range === '6m') {
+        start.setMonth(start.getMonth() - 6);
+    } else if (range === '1y') {
+        start.setFullYear(start.getFullYear() - 1);
+    }
+
+    return { start, end };
+
+}
+
+/**
  * Get list of last 12 months for dropdown
  * Returns a list of Dates, where each date represents the start of a month
  * in the selected calendar system.
@@ -200,6 +291,7 @@ export function getNepaliDaysInMonth(year: number, month: number): number {
     return nd.getDate();
 }
 
+
 /**
  * Get Nepali Year and Month from a JS Date
  */
@@ -210,4 +302,58 @@ export function toNepaliParts(date: Date): { year: number; month: number; day: n
         month: nd.getMonth(),
         day: nd.getDate()
     };
+}
+
+/**
+ * Get date range for calendar grid view (including padding days)
+ */
+export function getCalendarPageRange(date: Date, calendar: CalendarSystem = 'gregorian'): { start: Date; end: Date } {
+    if (calendar === 'nepali') {
+        try {
+            const nd = new NepaliDate(date);
+            const year = nd.getYear();
+            const month = nd.getMonth();
+
+            // Start of month
+            const startNd = new NepaliDate(year, month, 1);
+            const startDate = startNd.toJsDate(); // This returns Gregorian Date corresp. to 1st of Nepali Month
+
+            // Adjust to start of week (Sunday)
+            // startDate.getDay() gives 0 for Sunday, 1 for Monday...
+            const startPadding = startDate.getDay();
+            startDate.setDate(startDate.getDate() - startPadding);
+            startDate.setHours(0, 0, 0, 0);
+
+            // End of month
+            const endNd = new NepaliDate(year, month + 1, 0);
+            const endDate = endNd.toJsDate(); // Gregorian Date corresp. to last day of Nepali Month
+
+            // Adjust to end of week (Saturday)
+            // endDate.getDay() gives 0 for Sunday... 6 for Saturday
+            const endPadding = 6 - endDate.getDay();
+            endDate.setDate(endDate.getDate() + endPadding);
+            endDate.setHours(23, 59, 59, 999);
+
+            return { start: startDate, end: endDate };
+        } catch (e) {
+            console.error('Error calculating Nepali calendar page range', e);
+            // Fallback
+        }
+    }
+
+    // Gregorian Logic
+    const d = new Date(date);
+    const startOfMonth = new Date(d.getFullYear(), d.getMonth(), 1);
+    const endOfMonth = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+
+    const start = new Date(startOfMonth);
+    start.setDate(start.getDate() - start.getDay()); // Start on Sunday buffer
+    start.setHours(0, 0, 0, 0);
+
+    const end = new Date(endOfMonth);
+    const daysToAdd = 6 - end.getDay(); // End on Saturday buffer
+    end.setDate(end.getDate() + daysToAdd);
+    end.setHours(23, 59, 59, 999);
+
+    return { start, end };
 }

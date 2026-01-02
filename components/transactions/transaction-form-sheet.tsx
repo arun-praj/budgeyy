@@ -158,29 +158,63 @@ export function TransactionFormSheet({
     async function onSubmit(data: TransactionFormValues) {
         setIsLoading(true);
 
-        let result;
-        if (transaction) {
-            result = await updateTransaction(transaction.id, {
-                ...data,
-                necessityLevel: data.type === 'expense' ? data.necessityLevel : undefined,
-            });
-        } else {
-            result = await createTransaction({
-                ...data,
-                necessityLevel: data.type === 'expense' ? data.necessityLevel : undefined,
-            });
-        }
+        try {
+            let result;
+            // Optimistically check online status, but also catch errors
+            if (navigator.onLine) {
+                if (transaction) {
+                    result = await updateTransaction(transaction.id, {
+                        ...data,
+                        necessityLevel: data.type === 'expense' ? data.necessityLevel : undefined,
+                    });
+                } else {
+                    result = await createTransaction({
+                        ...data,
+                        necessityLevel: data.type === 'expense' ? data.necessityLevel : undefined,
+                    });
+                }
 
-        if (result.error) {
-            toast.error(result.error);
-        } else {
-            toast.success(`${transaction ? 'Updated' : 'Added'} ${data.type === 'income' ? 'Income' : data.type === 'savings' ? 'Savings' : 'Expense'} successfully`);
-            if (!transaction) form.reset();
-            setOpen(false);
-            router.refresh();
-        }
+                if (result.error) {
+                    throw new Error(result.error);
+                }
 
-        setIsLoading(false);
+                toast.success(`${transaction ? 'Updated' : 'Added'} ${data.type === 'income' ? 'Income' : data.type === 'savings' ? 'Savings' : 'Expense'} successfully`);
+            } else {
+                throw new Error('Offline');
+            }
+        } catch (error: any) {
+            // Offline fallback for creation ONLY
+            // Editing offline is complex (ID matching), so we skip it for now unless specific requirement
+            if ((!navigator.onLine || error.message === 'Offline' || error.message?.includes('fetch')) && !transaction) {
+                const { addOfflineTransaction } = await import('@/lib/local-db');
+
+                await addOfflineTransaction({
+                    amount: data.amount,
+                    date: data.date,
+                    description: data.description || '',
+                    type: data.type,
+                    categoryId: data.categoryId,
+                    isRecurring: data.isRecurring,
+                    necessityLevel: data.necessityLevel,
+                });
+
+                toast.success('Saved offline. Will sync when online.');
+                form.reset();
+                setOpen(false);
+                // No router refresh needed as it's not in server DB yet.
+                // TODO: Trigger a UI update to show "pending" item (via Context or just wait for sync)
+            } else {
+                toast.error(error.message || 'Something went wrong');
+            }
+        } finally {
+            if (!transaction && navigator.onLine) {
+                form.reset();
+                setOpen(false);
+                router.refresh();
+            }
+            // For offline case, we already reset/closed above
+            setIsLoading(false);
+        }
     }
 
     return (
