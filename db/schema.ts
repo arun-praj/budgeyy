@@ -245,6 +245,7 @@ export const tripInvites = pgTable('trip_invites', {
     tripId: uuid('trip_id').notNull().references(() => trips.id, { onDelete: 'cascade' }),
     email: text('email').notNull(),
     status: text('status', { enum: ['pending', 'accepted', 'rejected'] }).default('pending'),
+    guestAvatar: text('guest_avatar'), // JSON string for guest avatar config
     createdAt: timestamp('created_at').notNull().defaultNow(),
 });
 

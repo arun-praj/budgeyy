@@ -173,3 +173,15 @@ export async function submitOnboardingSurvey(data: OnboardingSurveyData) {
         return { error: 'Failed to submit survey' };
     }
 }
+
+export async function checkUserForInvite(email: string) {
+    const user = await db.query.users.findFirst({
+        where: eq(users.email, email),
+    });
+
+    if (user) {
+        return { exists: true, avatar: user.avatar, name: user.name };
+    }
+
+    return { exists: false, avatar: null, name: null };
+}

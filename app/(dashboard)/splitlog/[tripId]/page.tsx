@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation';
 import { getTrip } from '@/actions/trips';
 import { format } from 'date-fns';
-import { MapPin, Calendar, Plus } from 'lucide-react';
+import { MapPin, Calendar, Plus, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -59,21 +59,29 @@ export default async function TripDetailsPage(props: TripDetailsPageProps) {
 
 
 
-    // Fetch members (Creator + Accepted Invitees)
-    const acceptedEmails = trip.invites
-        .filter(i => i.status === 'accepted')
-        .map(i => i.email);
+    // Fetch members (Creator + All Invitees)
+    const invitedEmails = trip.invites.map(i => i.email.toLowerCase());
+    const memberUsersMap = new Map<string, typeof trip.user>();
 
-    let memberUsers = [trip.user]; // Start with creator
-
-    if (acceptedEmails.length > 0) {
+    if (invitedEmails.length > 0) {
         const invitedUsers = await db.query.users.findMany({
-            where: inArray(users.email, acceptedEmails)
+            where: inArray(users.email, invitedEmails)
         });
-        // Avoid duplicates if creator invited themselves (unlikely but possible)
-        const invitedUnique = invitedUsers.filter(u => u.id !== trip.userId);
-        memberUsers = [...memberUsers, ...invitedUnique];
+        invitedUsers.forEach(u => memberUsersMap.set(u.email, u));
     }
+
+    // Reconstruct valid member list for Timeline (Creator + All Registered Users regardless of status)
+    // We now include PENDING users if they have an account so they can be selected in expenses.
+    let memberUsers = [trip.user];
+
+    // memberUsersMap contains all invitees who have an account (queried above)
+    // We iterate through all invites to maintain order or just iterate the map values
+    // Using map values ensures unique users and only those who exist
+    memberUsersMap.forEach((u) => {
+        if (u.id !== trip.userId) {
+            memberUsers.push(u);
+        }
+    });
 
     return (
         <div className="min-h-screen bg-background pb-20">
@@ -112,8 +120,10 @@ export default async function TripDetailsPage(props: TripDetailsPageProps) {
                                 {/* Creator */}
                                 <Tooltip>
                                     <TooltipTrigger>
-                                        <div className="h-10 w-10 rounded-full border-2 border-background bg-muted overflow-hidden">
-                                            <NotionAvatar config={getAvatarConfig(trip.user.avatar)} className="h-full w-full" />
+                                        <div className="relative h-10 w-10">
+                                            <div className="h-full w-full rounded-full border-2 border-green-500 bg-muted overflow-hidden">
+                                                <NotionAvatar config={getAvatarConfig(trip.user.avatar)} className="h-full w-full" />
+                                            </div>
                                         </div>
                                     </TooltipTrigger>
                                     <TooltipContent>
@@ -122,20 +132,27 @@ export default async function TripDetailsPage(props: TripDetailsPageProps) {
                                 </Tooltip>
 
                                 {/* Invited Members */}
-                                {trip.invites && trip.invites.map((invite) => (
-                                    <Tooltip key={invite.email}>
-                                        <TooltipTrigger>
-                                            <div className="h-10 w-10 rounded-full border-2 border-background bg-indigo-100 flex items-center justify-center overflow-hidden">
-                                                <span className="text-xs font-semibold text-indigo-700">
-                                                    {invite.email[0].toUpperCase()}
-                                                </span>
-                                            </div>
-                                        </TooltipTrigger>
-                                        <TooltipContent>
-                                            <p>{invite.email} ({invite.status})</p>
-                                        </TooltipContent>
-                                    </Tooltip>
-                                ))}
+                                {trip.invites && trip.invites.map((invite) => {
+                                    const user = memberUsersMap.get(invite.email);
+                                    const avatarConfig = getAvatarConfig(user?.avatar || invite.guestAvatar || null);
+                                    const displayName = user?.name || invite.email;
+                                    const isJoined = invite.status === 'accepted';
+
+                                    return (
+                                        <Tooltip key={invite.email}>
+                                            <TooltipTrigger>
+                                                <div className="relative h-10 w-10 group">
+                                                    <div className={`h-full w-full rounded-full border-2 ${isJoined ? 'border-green-500' : 'border-orange-400'} bg-muted overflow-hidden`}>
+                                                        <NotionAvatar config={avatarConfig} className="h-full w-full" />
+                                                    </div>
+                                                </div>
+                                            </TooltipTrigger>
+                                            <TooltipContent>
+                                                <p>{displayName} ({invite.status})</p>
+                                            </TooltipContent>
+                                        </Tooltip>
+                                    );
+                                })}
                             </TooltipProvider>
 
                             {/* Invite Button */}

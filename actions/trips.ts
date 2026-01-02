@@ -32,7 +32,8 @@ export async function createTrip(data: {
     endDate?: Date;
     destination?: string;
     imageUrl?: string;
-    emails?: string[];
+    invites?: { email: string; guestAvatar?: string }[];
+    emails?: string[]; // Legacy support or transient
 }) {
     const session = await auth.api.getSession({
         headers: await headers()
@@ -52,13 +53,17 @@ export async function createTrip(data: {
         userId: session.user.id,
     }).returning({ id: trips.id });
 
-    if (data.emails && data.emails.length > 0) {
-        // Import tripInvites dynamically or ensure it's imported at top
+    // Handle invites (both new object format and legacy string array)
+    // Fix type inference by explicitly adding guestAvatar: undefined for legacy emails
+    const invitesToProcess = data.invites || (data.emails ? data.emails.map(e => ({ email: e, guestAvatar: undefined })) : []);
+
+    if (invitesToProcess.length > 0) {
         await db.insert(schema.tripInvites).values(
-            data.emails.map(email => ({
+            invitesToProcess.map(invite => ({
                 tripId: newTrip.id,
-                email,
+                email: invite.email,
                 status: 'pending' as const,
+                guestAvatar: invite.guestAvatar,
             }))
         );
     }

@@ -48,6 +48,9 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { createTrip } from '@/actions/trips';
 import { toast } from 'sonner';
+import { checkUserForInvite } from '@/actions/user';
+import { NotionAvatar } from '@/components/avatars/notion-avatar';
+import { AvatarConfig } from '@/components/avatars/notion-avatar/types';
 
 const tripSchema = z.object({
     destination: z.string().min(1, 'Destination is required'),
@@ -63,11 +66,46 @@ interface CreateTripDialogProps {
     trigger?: React.ReactNode;
 }
 
+interface InvitedUser {
+    email: string;
+    avatar: string | null; // JSON string
+    exists: boolean;
+}
+
+const generateRandomAvatar = (): string => {
+    const config = {
+        body: Math.floor(Math.random() * 29),
+        eyebrows: Math.floor(Math.random() * 10),
+        eyes: Math.floor(Math.random() * 10),
+        glass: Math.floor(Math.random() * 5),
+        hair: Math.floor(Math.random() * 30),
+        mouth: Math.floor(Math.random() * 10),
+        accessory: Math.floor(Math.random() * 10),
+        face: Math.floor(Math.random() * 10),
+        beard: Math.floor(Math.random() * 10),
+        detail: Math.floor(Math.random() * 10),
+    };
+    return JSON.stringify(config);
+};
+
+// Helper to parse avatar config safely
+const parseAvatarConfig = (json: string | null): AvatarConfig => {
+    if (!json) return generateRandomAvatarObject();
+    try {
+        return JSON.parse(json);
+    } catch {
+        return generateRandomAvatarObject();
+    }
+}
+
+const generateRandomAvatarObject = () => JSON.parse(generateRandomAvatar());
+
 export function CreateTripDialog({ trigger }: CreateTripDialogProps) {
     const [open, setOpen] = useState(false);
     const [showInvite, setShowInvite] = useState(false);
-    const [invitedEmails, setInvitedEmails] = useState<string[]>([]);
+    const [invitedUsers, setInvitedUsers] = useState<InvitedUser[]>([]);
     const [inviteInput, setInviteInput] = useState('');
+    const [isCheckingUser, setIsCheckingUser] = useState(false);
 
     const form = useForm<TripFormValues>({
         resolver: zodResolver(tripSchema),
@@ -90,12 +128,15 @@ export function CreateTripDialog({ trigger }: CreateTripDialogProps) {
                 destination: data.destination,
                 startDate: data.dateRange.from,
                 endDate: data.dateRange.to,
-                emails: invitedEmails,
+                invites: invitedUsers.map(u => ({
+                    email: u.email,
+                    guestAvatar: !u.exists && u.avatar ? u.avatar : undefined
+                })),
             });
             toast.success('Trip created successfully!');
             setOpen(false);
             form.reset();
-            setInvitedEmails([]);
+            setInvitedUsers([]);
             setShowInvite(false);
             setInviteInput('');
 
@@ -109,15 +150,50 @@ export function CreateTripDialog({ trigger }: CreateTripDialogProps) {
         }
     }
 
-    const addEmail = (email: string) => {
-        if (email && !invitedEmails.includes(email)) {
-            setInvitedEmails([...invitedEmails, email]);
+    const addEmail = async (rawEmail: string) => {
+        const email = rawEmail.toLowerCase().trim();
+        if (!email) return;
+
+        // Basic email validation
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            toast.error("Please enter a valid email address");
+            return;
         }
-        setInviteInput('');
+
+        if (invitedUsers.some(u => u.email === email)) {
+            setInviteInput('');
+            return;
+        }
+
+        setIsCheckingUser(true);
+        try {
+            const result = await checkUserForInvite(email);
+
+            const avatar = result.exists
+                ? result.avatar
+                : generateRandomAvatar();
+
+            setInvitedUsers([...invitedUsers, {
+                email,
+                avatar,
+                exists: result.exists
+            }]);
+        } catch (e) {
+            // Fallback
+            setInvitedUsers([...invitedUsers, {
+                email,
+                avatar: generateRandomAvatar(),
+                exists: false
+            }]);
+        } finally {
+            setIsCheckingUser(false);
+            setInviteInput('');
+        }
     };
 
-    const removeEmail = (email: string) => {
-        setInvitedEmails(invitedEmails.filter(e => e !== email));
+    const removeUser = (email: string) => {
+        setInvitedUsers(invitedUsers.filter(u => u.email !== email));
     };
 
     return (
@@ -206,7 +282,7 @@ export function CreateTripDialog({ trigger }: CreateTripDialogProps) {
 
                         {/* Invite Tripmates Section */}
                         <div className="space-y-2">
-                            {!showInvite && invitedEmails.length === 0 ? (
+                            {!showInvite && invitedUsers.length === 0 ? (
                                 <Button
                                     type="button"
                                     variant="link"
@@ -218,13 +294,21 @@ export function CreateTripDialog({ trigger }: CreateTripDialogProps) {
                             ) : (
                                 <div className="space-y-2">
                                     <FormLabel>Tripmates</FormLabel>
+
+                                    {/* Invited Use List */}
                                     <div className="flex flex-wrap gap-2 mb-2">
-                                        {invitedEmails.map((email) => (
-                                            <Badge key={email} variant="secondary" className="flex items-center gap-1">
-                                                {email}
+                                        {invitedUsers.map((user) => (
+                                            <Badge key={user.email} variant="secondary" className="flex items-center gap-2 py-1 pl-1 pr-2">
+                                                <div className="h-6 w-6 rounded-full bg-background border overflow-hidden">
+                                                    <NotionAvatar
+                                                        config={parseAvatarConfig(user.avatar)}
+                                                        className="h-full w-full"
+                                                    />
+                                                </div>
+                                                <span>{user.email}</span>
                                                 <button
                                                     type="button"
-                                                    onClick={() => removeEmail(email)}
+                                                    onClick={() => removeUser(user.email)}
                                                     className="ml-1 hover:text-destructive"
                                                 >
                                                     <X className="h-3 w-3" />
@@ -232,6 +316,7 @@ export function CreateTripDialog({ trigger }: CreateTripDialogProps) {
                                             </Badge>
                                         ))}
                                     </div>
+
                                     <Command className="border rounded-md">
                                         <CommandInput
                                             placeholder="Type email address..."
@@ -245,8 +330,13 @@ export function CreateTripDialog({ trigger }: CreateTripDialogProps) {
                                                         onSelect={() => addEmail(inviteInput)}
                                                         className="cursor-pointer"
                                                         value={inviteInput}
+                                                        disabled={isCheckingUser}
                                                     >
-                                                        <Mail className="mr-2 h-4 w-4" />
+                                                        {isCheckingUser ? (
+                                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                                        ) : (
+                                                            <Mail className="mr-2 h-4 w-4" />
+                                                        )}
                                                         Send email to <span className="font-semibold ml-1">{inviteInput}</span>
                                                     </CommandItem>
                                                 </CommandGroup>
