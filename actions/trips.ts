@@ -540,6 +540,9 @@ export async function updateTripName(tripId: string, name: string) {
 }
 
 export async function updateTripDates(tripId: string, startDate: Date, endDate?: Date) {
+    console.log('[updateTripDates] Starting update for trip:', tripId);
+    console.log('[updateTripDates] Dates:', { startDate, endDate });
+
     const session = await auth.api.getSession({
         headers: await headers()
     });
@@ -549,114 +552,129 @@ export async function updateTripDates(tripId: string, startDate: Date, endDate?:
     }
 
     // Verify trip belongs to user
+    console.log('[updateTripDates] Verifying session and ownership...');
     const trip = await db.query.trips.findFirst({
         where: eq(trips.id, tripId),
     });
 
     if (!trip || trip.userId !== session.user.id) {
+        console.error('[updateTripDates] Unauthorized access attempt');
         throw new Error('Unauthorized');
     }
 
-    // Use transaction to update both trip and itineraries
-    await db.transaction(async (tx) => {
-        // Update trip dates
-        await tx.update(trips)
-            .set({
-                startDate,
-                endDate: endDate || null,
-                updatedAt: new Date()
-            })
-            .where(eq(trips.id, tripId));
+    console.log('[updateTripDates] Updating trip dates in DB...');
+    // Update trip dates first
+    await db.update(trips)
+        .set({
+            startDate,
+            endDate: endDate || null,
+            updatedAt: new Date()
+        })
+        .where(eq(trips.id, tripId));
+    console.log('[updateTripDates] Trip dates updated.');
 
-        // Get existing itineraries
-        const existingItineraries = await tx.query.tripItineraries.findMany({
-            where: eq(schema.tripItineraries.tripId, tripId),
-        });
+    // Get existing itineraries
+    console.log('[updateTripDates] Fetching existing itineraries...');
+    const existingItineraries = await db.query.tripItineraries.findMany({
+        where: eq(schema.tripItineraries.tripId, tripId),
+    });
+    console.log(`[updateTripDates] Found ${existingItineraries.length} existing itineraries.`);
 
-        // Calculate new date range
-        const newDatesMap = new Map<string, number>(); // dateStr -> dayNumber
-        let currentDate = new Date(startDate);
-        const end = endDate ? new Date(endDate) : new Date(startDate);
-        let dayCount = 1;
+    // Calculate new date range
+    const newDatesMap = new Map<string, number>(); // dateStr -> dayNumber
+    let currentDate = new Date(startDate);
+    const end = endDate ? new Date(endDate) : new Date(startDate);
+    let dayCount = 1;
 
-        while (currentDate <= end) {
-            const dateStr = currentDate.toISOString().split('T')[0];
-            newDatesMap.set(dateStr, dayCount);
-            currentDate.setDate(currentDate.getDate() + 1);
-            dayCount++;
+    console.log('[updateTripDates] Calculating new date map...');
+    while (currentDate <= end) {
+        const dateStr = currentDate.toISOString().split('T')[0];
+        newDatesMap.set(dateStr, dayCount);
+        currentDate.setDate(currentDate.getDate() + 1);
+        dayCount++;
+    }
+
+    // Separate itineraries into: keep (update dayNumber) vs delete
+    const itinerariesToKeep: { id: string; dateStr: string; newDayNumber: number }[] = [];
+    const itineraryIdsToDelete: string[] = [];
+
+    for (const itinerary of existingItineraries) {
+        if (!itinerary.date) {
+            itineraryIdsToDelete.push(itinerary.id);
+            continue;
         }
 
-        // Separate itineraries into: keep (update dayNumber) vs delete
-        const itinerariesToKeep: { id: string; dateStr: string; newDayNumber: number }[] = [];
-        const itineraryIdsToDelete: string[] = [];
+        const dateStr = itinerary.date.toISOString().split('T')[0];
+        const newDayNumber = newDatesMap.get(dateStr);
 
-        for (const itinerary of existingItineraries) {
-            if (!itinerary.date) {
-                itineraryIdsToDelete.push(itinerary.id);
-                continue;
-            }
-
-            const dateStr = itinerary.date.toISOString().split('T')[0];
-            const newDayNumber = newDatesMap.get(dateStr);
-
-            if (newDayNumber !== undefined) {
-                // This date is in the new range - keep it and update dayNumber
-                itinerariesToKeep.push({ id: itinerary.id, dateStr, newDayNumber });
-            } else {
-                // This date is NOT in the new range - delete it
-                itineraryIdsToDelete.push(itinerary.id);
-            }
+        if (newDayNumber !== undefined) {
+            itinerariesToKeep.push({ id: itinerary.id, dateStr, newDayNumber });
+        } else {
+            itineraryIdsToDelete.push(itinerary.id);
         }
+    }
 
-        // Delete itineraries that are outside the new date range
-        if (itineraryIdsToDelete.length > 0) {
-            await tx.delete(schema.tripItineraries)
-                .where(and(
-                    eq(schema.tripItineraries.tripId, tripId),
-                    inArray(schema.tripItineraries.id, itineraryIdsToDelete)
-                ));
-        }
+    console.log(`[updateTripDates] Itineraries to keep: ${itinerariesToKeep.length}, to delete: ${itineraryIdsToDelete.length}`);
 
-        // Update dayNumber for kept itineraries
+    // Delete itineraries that are outside the new date range
+    if (itineraryIdsToDelete.length > 0) {
+        console.log('[updateTripDates] Deleting old itineraries...');
+        await db.delete(schema.tripItineraries)
+            .where(and(
+                eq(schema.tripItineraries.tripId, tripId),
+                inArray(schema.tripItineraries.id, itineraryIdsToDelete)
+            ));
+        console.log('[updateTripDates] Old itineraries deleted.');
+    }
+
+    // Update dayNumber for kept itineraries (batch update if possible)
+    if (itinerariesToKeep.length > 0) {
+        console.log('[updateTripDates] Updating existing itineraries day numbers...');
         for (const item of itinerariesToKeep) {
-            await tx.update(schema.tripItineraries)
+            await db.update(schema.tripItineraries)
                 .set({ dayNumber: item.newDayNumber, updatedAt: new Date() })
                 .where(eq(schema.tripItineraries.id, item.id));
         }
+        console.log('[updateTripDates] Existing itineraries updated.');
+    }
 
-        // Find which dates need new itineraries (dates in new range that don't already exist)
-        const existingDateStrs = new Set(itinerariesToKeep.map(i => i.dateStr));
-        const datesToCreate: { date: Date; dayNumber: number }[] = [];
+    // Find which dates need new itineraries (dates in new range that don't already exist)
+    const existingDateStrs = new Set(itinerariesToKeep.map(i => i.dateStr));
+    const datesToCreate: { date: Date; dayNumber: number }[] = [];
 
-        currentDate = new Date(startDate);
-        dayCount = 1;
-        while (currentDate <= end) {
-            const dateStr = currentDate.toISOString().split('T')[0];
-            if (!existingDateStrs.has(dateStr)) {
-                datesToCreate.push({
-                    date: new Date(currentDate),
-                    dayNumber: dayCount,
-                });
-            }
-            currentDate.setDate(currentDate.getDate() + 1);
-            dayCount++;
+    currentDate = new Date(startDate);
+    dayCount = 1;
+    while (currentDate <= end) {
+        const dateStr = currentDate.toISOString().split('T')[0];
+        if (!existingDateStrs.has(dateStr)) {
+            datesToCreate.push({
+                date: new Date(currentDate),
+                dayNumber: dayCount,
+            });
         }
+        currentDate.setDate(currentDate.getDate() + 1);
+        dayCount++;
+    }
 
-        // Create new itineraries for missing dates
-        if (datesToCreate.length > 0) {
-            await tx.insert(schema.tripItineraries).values(
-                datesToCreate.map(d => ({
-                    tripId: tripId,
-                    dayNumber: d.dayNumber,
-                    date: d.date,
-                    title: '',
-                }))
-            );
-        }
-    });
+    console.log(`[updateTripDates] Creating ${datesToCreate.length} new itineraries...`);
 
+    // Create new itineraries for missing dates
+    if (datesToCreate.length > 0) {
+        await db.insert(schema.tripItineraries).values(
+            datesToCreate.map(d => ({
+                tripId: tripId,
+                dayNumber: d.dayNumber,
+                date: d.date,
+                title: '',
+            }))
+        );
+        console.log('[updateTripDates] New itineraries created.');
+    }
+
+    console.log('[updateTripDates] Revalidating paths...');
     revalidatePath(`/splitlog/${tripId}`);
     revalidatePath('/splitlog');
+    console.log('[updateTripDates] Update complete.');
 
     return { success: true };
 }

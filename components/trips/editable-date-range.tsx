@@ -21,6 +21,7 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { useRouter } from 'next/navigation';
 import { updateTripDates, checkItineraryConflicts } from '@/actions/trips';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -45,6 +46,7 @@ interface ConflictInfo {
 }
 
 export function EditableDateRange({ tripId, startDate, endDate }: EditableDateRangeProps) {
+    const router = useRouter();
     const [isOpen, setIsOpen] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [isChecking, setIsChecking] = useState(false);
@@ -55,10 +57,20 @@ export function EditableDateRange({ tripId, startDate, endDate }: EditableDateRa
         from: startDate || undefined,
         to: endDate || undefined,
     });
-    const [originalDateRange] = useState<DateRange | undefined>({
+    const [originalDateRange, setOriginalDateRange] = useState<DateRange | undefined>({
         from: startDate || undefined,
         to: endDate || undefined,
     });
+
+    // Update state when props change (e.g. after router.refresh)
+    useEffect(() => {
+        const newRange = {
+            from: startDate || undefined,
+            to: endDate || undefined,
+        };
+        setDateRange(newRange);
+        setOriginalDateRange(newRange);
+    }, [startDate, endDate]);
 
     // Start countdown when dialog opens
     useEffect(() => {
@@ -120,6 +132,7 @@ export function EditableDateRange({ tripId, startDate, endDate }: EditableDateRa
             toast.success('Trip dates and itinerary updated');
             setIsOpen(false);
             setShowConfirmDialog(false);
+            router.refresh(); // Refresh server components to update data
         } catch (error) {
             toast.error('Failed to update dates');
             console.error(error);
@@ -133,7 +146,8 @@ export function EditableDateRange({ tripId, startDate, endDate }: EditableDateRa
         setIsOpen(false);
     };
 
-    const handleConfirmDelete = async () => {
+    const handleConfirmDelete = async (e: React.MouseEvent) => {
+        e.preventDefault(); // Prevent AlertDialogAction from auto-closing
         await saveChanges();
     };
 
