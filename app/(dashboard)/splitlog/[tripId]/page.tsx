@@ -70,16 +70,44 @@ export default async function TripDetailsPage(props: TripDetailsPageProps) {
         invitedUsers.forEach(u => memberUsersMap.set(u.email, u));
     }
 
-    // Reconstruct valid member list for Timeline (Creator + All Registered Users regardless of status)
-    // We now include PENDING users if they have an account so they can be selected in expenses.
-    let memberUsers = [trip.user];
+    // Reconstruct valid member list for Timeline (Creator + All Invitees)
+    // We iterate through all invites.
+    // If an invite matches a registered user (by email), we use the User object (isGuest: false).
+    // If NO registered user exists, we create a Guest object using the invite data (isGuest: true).
 
-    // memberUsersMap contains all invitees who have an account (queried above)
-    // We iterate through all invites to maintain order or just iterate the map values
-    // Using map values ensures unique users and only those who exist
-    memberUsersMap.forEach((u) => {
-        if (u.id !== trip.userId) {
-            memberUsers.push(u);
+    // Start with creator
+    let memberUsers: { id: string; name: string | null; email: string; image?: string | null; isGuest?: boolean }[] = [{
+        ...trip.user,
+        isGuest: false
+    }];
+
+    // Set of added emails to avoid duplicates if any (though logic handles uniqueness by invite/user)
+    const addedEmails = new Set<string>([trip.user.email]);
+
+    trip.invites.forEach(invite => {
+        const email = invite.email.toLowerCase();
+        if (addedEmails.has(email)) return;
+
+        const registeredUser = memberUsersMap.get(email);
+        if (registeredUser) {
+            if (registeredUser.id !== trip.userId) {
+                memberUsers.push({
+                    ...registeredUser,
+                    isGuest: false
+                });
+                addedEmails.add(email);
+            }
+        } else {
+            // It's a Guest!
+            // Use invite.id as the ID for keys/db references
+            memberUsers.push({
+                id: invite.id, // Use Invite UUID
+                name: email.split('@')[0], // Fallback name
+                email: email,
+                image: invite.guestAvatar || null,
+                isGuest: true
+            });
+            addedEmails.add(email);
         }
     });
 

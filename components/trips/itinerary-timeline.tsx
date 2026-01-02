@@ -51,11 +51,12 @@ interface ItineraryTimelineProps {
     items: ItineraryItem[];
     categories?: any[];
     tripId: string;
-    members: { id: string; name: string | null; email: string; image?: string | null }[];
+    members: { id: string; name: string | null; email: string; image?: string | null; isGuest?: boolean }[];
     currentUser: { id: string; name?: string | null; email: string; image?: string | null };
 }
 
 export function ItineraryTimeline({ items, categories = [], tripId, members = [], currentUser }: ItineraryTimelineProps) {
+    // ... (state lines 59-136 omitted for brevity, keeping same)
     // Add Item State
     const [activeDayId, setActiveDayId] = useState<string | null>(null);
     const [dialogType, setDialogType] = useState<'checklist' | 'expense' | null>(null);
@@ -140,8 +141,13 @@ export function ItineraryTimeline({ items, categories = [], tripId, members = []
         try {
             const amount = parseFloat(expenseAmount);
 
+            // Helpers to find member type
+            const getMember = (id: string) => members.find(m => m.id === id);
+            const isGuest = (id: string) => getMember(id)?.isGuest === true;
+
             // Payer Logic
-            let payers: { userId: string; amount: number }[] = [];
+            let payers: { userId?: string; guestId?: string; amount: number }[] = [];
+
             if (isMultiPayer) {
                 const payerIds = Object.keys(multiPayerAmounts);
                 if (payerIds.length === 0) {
@@ -154,7 +160,11 @@ export function ItineraryTimeline({ items, categories = [], tripId, members = []
                 payers = payerIds.map(id => {
                     const val = parseFloat(multiPayerAmounts[id] || '0');
                     totalPaid += val;
-                    return { userId: id, amount: val };
+                    if (isGuest(id)) {
+                        return { guestId: id, amount: val };
+                    } else {
+                        return { userId: id, amount: val };
+                    }
                 });
 
                 if (Math.abs(totalPaid - amount) > 0.01) {
@@ -168,18 +178,29 @@ export function ItineraryTimeline({ items, categories = [], tripId, members = []
                     setIsSubmitting(false);
                     return;
                 }
-                payers = [{ userId: payerId, amount }];
+                const pAmnt = amount;
+                if (isGuest(payerId)) {
+                    payers = [{ guestId: payerId, amount: pAmnt }];
+                } else {
+                    payers = [{ userId: payerId, amount: pAmnt }];
+                }
             }
 
-            let splits: { userId: string; amount: number }[] = [];
+            let splits: { userId?: string; guestId?: string; amount: number }[] = [];
 
             if (splitType === 'equal') {
                 const share = amount / members.length;
-                splits = members.map(m => ({ userId: m.id, amount: share }));
+                splits = members.map(m => {
+                    if (m.isGuest) return { guestId: m.id, amount: share };
+                    return { userId: m.id, amount: share };
+                });
             } else if (splitType === 'specific') {
                 if (selectedSplitUsers.length > 0) {
                     const share = amount / selectedSplitUsers.length;
-                    splits = selectedSplitUsers.map(id => ({ userId: id, amount: share }));
+                    splits = selectedSplitUsers.map(id => {
+                        if (isGuest(id)) return { guestId: id, amount: share };
+                        return { userId: id, amount: share };
+                    });
                 }
             }
             // If 'none', splits is empty
@@ -193,8 +214,9 @@ export function ItineraryTimeline({ items, categories = [], tripId, members = []
                 tripId: activeTripId,
                 tripItineraryId: activeDayId,
                 isCredit: false,
-                payers, // Pass payers array
-                // paidByUserId is ignored on backend if payers is present, but we can omit or pass null
+                payers, // Pass mixed payers array
+                // Legacy paidByUserId is optional, backend handles payers array now
+                // We can strictly rely on passing `payers`
                 splits,
             });
             toast.success('Expense added');

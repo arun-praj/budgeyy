@@ -341,9 +341,10 @@ export async function createTripTransaction(data: {
     description?: string;
     isCredit?: boolean;
 
-    splits?: { userId: string; amount: number }[];
-    paidByUserId?: string; // Legacy/Single payer fallback
-    payers?: { userId: string; amount: number }[];
+    splits?: { userId?: string; guestId?: string; amount: number }[];
+    paidByUserId?: string; // Legacy/Single user payer fallback
+    paidByGuestId?: string; // Single guest payer fallback
+    payers?: { userId?: string; guestId?: string; amount: number }[];
 }) {
     const session = await auth.api.getSession({
         headers: await headers()
@@ -351,15 +352,19 @@ export async function createTripTransaction(data: {
 
     if (!session?.user?.id) throw new Error('Unauthorized');
 
-    // Determine payers: prioritize explicit payers array, fallback to paidByUserId (single payer full amount)
+    // Determine payers: prioritize explicit payers array
     let finalPayers = data.payers || [];
-    if (finalPayers.length === 0 && data.paidByUserId) {
-        finalPayers = [{ userId: data.paidByUserId, amount: data.amount }];
-    }
-    // If absolutely no payer data, default to creator? Or let it fail/be handled? 
-    // For now, let's assume valid data provided or fallback to creator as single payer if purely empty
+
+    // Fallback logic if payers array is empty
     if (finalPayers.length === 0) {
-        finalPayers = [{ userId: session.user.id, amount: data.amount }];
+        if (data.paidByGuestId) {
+            finalPayers = [{ guestId: data.paidByGuestId, amount: data.amount }];
+        } else if (data.paidByUserId) {
+            finalPayers = [{ userId: data.paidByUserId, amount: data.amount }];
+        } else {
+            // Default to creator if absolutely no info
+            finalPayers = [{ userId: session.user.id, amount: data.amount }];
+        }
     }
 
     // Use transaction to ensure consistency
@@ -368,14 +373,16 @@ export async function createTripTransaction(data: {
             ...data,
             amount: data.amount.toString(),
             userId: session.user.id,
-            paidByUserId: data.paidByUserId || finalPayers[0]?.userId, // Keep populating for compatibility if needed/easy
+            paidByUserId: finalPayers[0]?.userId || null,
+            paidByGuestId: finalPayers[0]?.guestId || null,
         }).returning();
 
         if (data.splits && data.splits.length > 0) {
             await tx.insert(schema.tripTransactionSplits).values(
                 data.splits.map(split => ({
                     tripTransactionId: transaction.id,
-                    userId: split.userId,
+                    userId: split.userId || null,
+                    guestId: split.guestId || null,
                     amount: split.amount.toString(),
                 }))
             );
@@ -385,7 +392,8 @@ export async function createTripTransaction(data: {
             await tx.insert(schema.tripTransactionPayers).values(
                 finalPayers.map(payer => ({
                     tripTransactionId: transaction.id,
-                    userId: payer.userId,
+                    userId: payer.userId || null,
+                    guestId: payer.guestId || null,
                     amount: payer.amount.toString(),
                 }))
             );
@@ -405,9 +413,10 @@ export async function updateTripTransaction(id: string, data: {
     categoryId?: string;
     description?: string;
     isCredit?: boolean;
-    splits?: { userId: string; amount: number }[];
+    splits?: { userId?: string; guestId?: string; amount: number }[];
     paidByUserId?: string;
-    payers?: { userId: string; amount: number }[];
+    paidByGuestId?: string;
+    payers?: { userId?: string; guestId?: string; amount: number }[];
 }) {
     const session = await auth.api.getSession({
         headers: await headers()
@@ -423,10 +432,9 @@ export async function updateTripTransaction(id: string, data: {
             updatedAt: new Date(),
         };
 
-        // Update legacy paidByUserId if implicit in single-payer update
-        if (data.paidByUserId) {
-            updateData.paidByUserId = data.paidByUserId;
-        }
+        // Update legacy paidBy columns if implicit in single-payer update
+        if (data.paidByUserId !== undefined) updateData.paidByUserId = data.paidByUserId;
+        if (data.paidByGuestId !== undefined) updateData.paidByGuestId = data.paidByGuestId;
 
         const [transaction] = await tx.update(schema.tripTransactions)
             .set(updateData)
@@ -442,7 +450,8 @@ export async function updateTripTransaction(id: string, data: {
                 await tx.insert(schema.tripTransactionSplits).values(
                     data.splits.map(split => ({
                         tripTransactionId: id,
-                        userId: split.userId,
+                        userId: split.userId || null,
+                        guestId: split.guestId || null,
                         amount: split.amount.toString(),
                     }))
                 );

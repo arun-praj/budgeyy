@@ -158,6 +158,7 @@ export const tripTransactions = pgTable('trip_transactions', {
     categoryId: uuid('category_id').references(() => categories.id, { onDelete: 'set null' }),
     userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
     paidByUserId: text('paid_by_user_id').references(() => users.id, { onDelete: 'set null' }),
+    paidByGuestId: uuid('paid_by_guest_id').references(() => tripInvites.id, { onDelete: 'set null' }),
     tripId: uuid('trip_id').notNull().references(() => trips.id, { onDelete: 'cascade' }),
     tripItineraryId: uuid('trip_itinerary_id').notNull().references(() => tripItineraries.id, { onDelete: 'cascade' }),
     // Images
@@ -175,7 +176,8 @@ export const tripTransactions = pgTable('trip_transactions', {
 export const tripTransactionSplits = pgTable('trip_transaction_splits', {
     id: uuid('id').primaryKey().defaultRandom(),
     tripTransactionId: uuid('trip_transaction_id').notNull().references(() => tripTransactions.id, { onDelete: 'cascade' }),
-    userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    userId: text('user_id').references(() => users.id, { onDelete: 'cascade' }),
+    guestId: uuid('guest_id').references(() => tripInvites.id, { onDelete: 'cascade' }),
     amount: decimal('amount', { precision: 12, scale: 2 }).notNull(),
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
@@ -185,7 +187,8 @@ export const tripTransactionSplits = pgTable('trip_transaction_splits', {
 export const tripTransactionPayers = pgTable('trip_transaction_payers', {
     id: uuid('id').primaryKey().defaultRandom(),
     tripTransactionId: uuid('trip_transaction_id').notNull().references(() => tripTransactions.id, { onDelete: 'cascade' }),
-    userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    userId: text('user_id').references(() => users.id, { onDelete: 'cascade' }),
+    guestId: uuid('guest_id').references(() => tripInvites.id, { onDelete: 'cascade' }),
     amount: decimal('amount', { precision: 12, scale: 2 }).notNull(),
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
@@ -341,6 +344,10 @@ export const tripTransactionsRelations = relations(tripTransactions, ({ one, man
         fields: [tripTransactions.paidByUserId],
         references: [users.id],
     }),
+    paidByGuest: one(tripInvites, {
+        fields: [tripTransactions.paidByGuestId],
+        references: [tripInvites.id],
+    }),
     splits: many(tripTransactionSplits),
     payers: many(tripTransactionPayers),
 }));
@@ -354,6 +361,10 @@ export const tripTransactionSplitsRelations = relations(tripTransactionSplits, (
         fields: [tripTransactionSplits.userId],
         references: [users.id],
     }),
+    guest: one(tripInvites, {
+        fields: [tripTransactionSplits.guestId],
+        references: [tripInvites.id],
+    }),
 }));
 
 export const tripTransactionPayersRelations = relations(tripTransactionPayers, ({ one }) => ({
@@ -364,6 +375,10 @@ export const tripTransactionPayersRelations = relations(tripTransactionPayers, (
     user: one(users, {
         fields: [tripTransactionPayers.userId],
         references: [users.id],
+    }),
+    guest: one(tripInvites, {
+        fields: [tripTransactionPayers.guestId],
+        references: [tripInvites.id],
     }),
 }));
 
