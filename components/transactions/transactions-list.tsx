@@ -54,13 +54,76 @@ const necessityColors = {
     savings: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20',
 };
 
-export function TransactionsList({ transactions, currency = 'USD', calendar = 'gregorian' }: TransactionsListProps) {
+export function TransactionsList({ transactions: initialTransactions, currency = 'USD', calendar = 'gregorian' }: TransactionsListProps) {
     const router = useRouter();
+    const [transactions, setTransactions] = useState<TransactionWithUserAndCategory[]>(initialTransactions);
     const [search, setSearch] = useState('');
     const [typeFilter, setTypeFilter] = useState<string>('all');
     const [necessityFilter, setNecessityFilter] = useState<string>('all');
     const [editingTransaction, setEditingTransaction] = useState<TransactionWithUserAndCategory | null>(null);
     const [viewingTransaction, setViewingTransaction] = useState<TransactionWithUserAndCategory | null>(null);
+    const [isOfflineMode, setIsOfflineMode] = useState(false);
+
+    // Sync with props
+    useEffect(() => {
+        if (initialTransactions && initialTransactions.length > 0) {
+            setTransactions(initialTransactions);
+        }
+    }, [initialTransactions]);
+
+    // Handle Caching & Offline Read
+    useEffect(() => {
+        const handleDataPersistence = async () => {
+            // Write to Cache if we have data and are online
+            if (navigator.onLine && initialTransactions.length > 0) {
+                try {
+                    // Lazy load to avoid server-side import issues if any
+                    const { cacheTransactions } = await import('@/lib/local-db');
+
+                    // Map to cached format
+                    const cachedData = initialTransactions.map(tx => ({
+                        id: tx.id,
+                        amount: tx.amount,
+                        date: typeof tx.date === 'string' ? tx.date : tx.date.toISOString(),
+                        description: tx.description,
+                        type: tx.type,
+                        categoryId: tx.categoryId,
+                        categoryName: tx.category?.name,
+                        isRecurring: tx.isRecurring,
+                        necessityLevel: tx.necessityLevel,
+                        userId: tx.userId,
+                        createdAt: typeof tx.createdAt === 'string' ? tx.createdAt : tx.createdAt.toISOString(),
+                    }));
+
+                    await cacheTransactions(cachedData);
+                } catch (err) {
+                    console.error('Failed to cache transactions', err);
+                }
+            } else if ((!initialTransactions || initialTransactions.length === 0) && !navigator.onLine) {
+                // READ from Cache if offline and no server data
+                try {
+                    const { getCachedTransactions } = await import('@/lib/local-db');
+                    const cached = await getCachedTransactions();
+                    if (cached && cached.length > 0) {
+                        // Map back to UI format
+                        const uiTransactions: any[] = cached.map(c => ({
+                            ...c,
+                            date: new Date(c.date),
+                            createdAt: new Date(c.createdAt),
+                            category: c.categoryName ? { name: c.categoryName, icon: '🏷️' } : null // Simple mock category
+                        }));
+                        setTransactions(uiTransactions);
+                        setIsOfflineMode(true);
+                        toast.info('Viewing offline copy of last session');
+                    }
+                } catch (err) {
+                    console.error('Failed to read cached transactions', err);
+                }
+            }
+        };
+
+        handleDataPersistence();
+    }, [initialTransactions]);
 
     const filteredTransactions = transactions.filter((tx) => {
         const matchesSearch = tx.description?.toLowerCase().includes(search.toLowerCase()) ?? true;
@@ -71,6 +134,12 @@ export function TransactionsList({ transactions, currency = 'USD', calendar = 'g
 
     const handleDelete = async (e: React.MouseEvent, id: string) => {
         e.stopPropagation(); // Prevent opening the edit sheet
+
+        if (!navigator.onLine) {
+            toast.error("Cannot delete while offline");
+            return;
+        }
+
         const result = await deleteTransaction(id);
         if (result.error) {
             toast.error(result.error);
@@ -83,7 +152,12 @@ export function TransactionsList({ transactions, currency = 'USD', calendar = 'g
     return (
         <Card>
             <CardHeader>
-                <CardTitle>All Transactions</CardTitle>
+                <div className="flex justify-between items-center">
+                    <CardTitle>
+                        All Transactions
+                        {isOfflineMode && <Badge variant="outline" className="ml-2 text-yellow-600 border-yellow-600">Offline View</Badge>}
+                    </CardTitle>
+                </div>
             </CardHeader>
             <CardContent className="space-y-4">
                 {/* Filters */}
