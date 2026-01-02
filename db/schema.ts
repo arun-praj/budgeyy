@@ -157,6 +157,7 @@ export const tripTransactions = pgTable('trip_transactions', {
     type: transactionTypeEnum('type').notNull(),
     categoryId: uuid('category_id').references(() => categories.id, { onDelete: 'set null' }),
     userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    paidByUserId: text('paid_by_user_id').references(() => users.id, { onDelete: 'set null' }),
     tripId: uuid('trip_id').notNull().references(() => trips.id, { onDelete: 'cascade' }),
     tripItineraryId: uuid('trip_itinerary_id').notNull().references(() => tripItineraries.id, { onDelete: 'cascade' }),
     // Images
@@ -166,6 +167,26 @@ export const tripTransactions = pgTable('trip_transactions', {
     isDeleted: boolean('is_delete').default(false).notNull(),
     deletedAt: timestamp('deleted_at'),
     order: integer('order').default(0),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
+// Trip Transaction Splits
+export const tripTransactionSplits = pgTable('trip_transaction_splits', {
+    id: uuid('id').primaryKey().defaultRandom(),
+    tripTransactionId: uuid('trip_transaction_id').notNull().references(() => tripTransactions.id, { onDelete: 'cascade' }),
+    userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    amount: decimal('amount', { precision: 12, scale: 2 }).notNull(),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
+// Trip Transaction Payers
+export const tripTransactionPayers = pgTable('trip_transaction_payers', {
+    id: uuid('id').primaryKey().defaultRandom(),
+    tripTransactionId: uuid('trip_transaction_id').notNull().references(() => tripTransactions.id, { onDelete: 'cascade' }),
+    userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    amount: decimal('amount', { precision: 12, scale: 2 }).notNull(),
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
@@ -298,7 +319,7 @@ export const transactionsRelations = relations(transactions, ({ one }) => ({
     }),
 }));
 
-export const tripTransactionsRelations = relations(tripTransactions, ({ one }) => ({
+export const tripTransactionsRelations = relations(tripTransactions, ({ one, many }) => ({
     user: one(users, {
         fields: [tripTransactions.userId],
         references: [users.id],
@@ -315,7 +336,36 @@ export const tripTransactionsRelations = relations(tripTransactions, ({ one }) =
         fields: [tripTransactions.tripItineraryId],
         references: [tripItineraries.id],
     }),
+    paidByUser: one(users, {
+        fields: [tripTransactions.paidByUserId],
+        references: [users.id],
+    }),
+    splits: many(tripTransactionSplits),
+    payers: many(tripTransactionPayers),
 }));
+
+export const tripTransactionSplitsRelations = relations(tripTransactionSplits, ({ one }) => ({
+    transaction: one(tripTransactions, {
+        fields: [tripTransactionSplits.tripTransactionId],
+        references: [tripTransactions.id],
+    }),
+    user: one(users, {
+        fields: [tripTransactionSplits.userId],
+        references: [users.id],
+    }),
+}));
+
+export const tripTransactionPayersRelations = relations(tripTransactionPayers, ({ one }) => ({
+    transaction: one(tripTransactions, {
+        fields: [tripTransactionPayers.tripTransactionId],
+        references: [tripTransactions.id],
+    }),
+    user: one(users, {
+        fields: [tripTransactionPayers.userId],
+        references: [users.id],
+    }),
+}));
+
 
 export type Transaction = typeof transactions.$inferSelect;
 export type Category = typeof categories.$inferSelect;
@@ -323,4 +373,6 @@ export type User = typeof users.$inferSelect;
 export type Trip = typeof trips.$inferSelect;
 export type TripItinerary = typeof tripItineraries.$inferSelect;
 export type TripTransaction = typeof tripTransactions.$inferSelect;
+export type TripTransactionSplit = typeof tripTransactionSplits.$inferSelect;
+export type TripTransactionPayer = typeof tripTransactionPayers.$inferSelect;
 export type Budget = typeof budgets.$inferSelect;

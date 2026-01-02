@@ -21,6 +21,10 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { useDebounce } from 'use-debounce';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { User } from '@/db/schema';
 
 interface ItineraryItem {
     id: string;
@@ -47,13 +51,29 @@ interface ItineraryTimelineProps {
     items: ItineraryItem[];
     categories?: any[];
     tripId: string;
+    members: { id: string; name: string | null; email: string; image?: string | null }[];
+    currentUser: { id: string; name?: string | null; email: string; image?: string | null };
 }
 
-export function ItineraryTimeline({ items, categories = [], tripId }: ItineraryTimelineProps) {
+export function ItineraryTimeline({ items, categories = [], tripId, members = [], currentUser }: ItineraryTimelineProps) {
     // Add Item State
     const [activeDayId, setActiveDayId] = useState<string | null>(null);
     const [dialogType, setDialogType] = useState<'checklist' | 'expense' | null>(null);
     const [activeTripId, setActiveTripId] = useState<string | null>(null);
+
+    // Split State
+    const [payerId, setPayerId] = useState<string>(currentUser?.id || '');
+    const [splitType, setSplitType] = useState<'equal' | 'specific' | 'none'>('equal');
+    const [selectedSplitUsers, setSelectedSplitUsers] = useState<string[]>([]); // ids
+    const [isMultiPayer, setIsMultiPayer] = useState(false);
+    const [multiPayerAmounts, setMultiPayerAmounts] = useState<Record<string, string>>({}); // userId -> amount string
+
+    useEffect(() => {
+        if (members.length > 0) {
+            setSelectedSplitUsers(members.map(m => m.id));
+        }
+    }, [members]);
+
 
     // Inline Note Creation State
     const [pendingNoteDayId, setPendingNoteDayId] = useState<string | null>(null);
@@ -75,6 +95,12 @@ export function ItineraryTimeline({ items, categories = [], tripId }: ItineraryT
         setExpenseAmount('');
         setExpenseDesc('');
         setExpenseCategory('');
+        // Reset split state
+        setPayerId(currentUser?.id || '');
+        setSplitType('equal');
+        setSelectedSplitUsers(members.map(m => m.id));
+        setIsMultiPayer(false);
+        setMultiPayerAmounts({});
     };
 
     const handleCreateNote = (dayId: string) => {
@@ -112,8 +138,54 @@ export function ItineraryTimeline({ items, categories = [], tripId }: ItineraryT
         if (!activeDayId || !expenseAmount || !activeTripId) return;
         setIsSubmitting(true);
         try {
+            const amount = parseFloat(expenseAmount);
+
+            // Payer Logic
+            let payers: { userId: string; amount: number }[] = [];
+            if (isMultiPayer) {
+                const payerIds = Object.keys(multiPayerAmounts);
+                if (payerIds.length === 0) {
+                    toast.error('Please select at least one payer');
+                    setIsSubmitting(false);
+                    return;
+                }
+
+                let totalPaid = 0;
+                payers = payerIds.map(id => {
+                    const val = parseFloat(multiPayerAmounts[id] || '0');
+                    totalPaid += val;
+                    return { userId: id, amount: val };
+                });
+
+                if (Math.abs(totalPaid - amount) > 0.01) {
+                    toast.error(`Total paid (${totalPaid}) does not match expense amount (${amount})`);
+                    setIsSubmitting(false);
+                    return;
+                }
+            } else {
+                if (!payerId) {
+                    toast.error('Please select a payer');
+                    setIsSubmitting(false);
+                    return;
+                }
+                payers = [{ userId: payerId, amount }];
+            }
+
+            let splits: { userId: string; amount: number }[] = [];
+
+            if (splitType === 'equal') {
+                const share = amount / members.length;
+                splits = members.map(m => ({ userId: m.id, amount: share }));
+            } else if (splitType === 'specific') {
+                if (selectedSplitUsers.length > 0) {
+                    const share = amount / selectedSplitUsers.length;
+                    splits = selectedSplitUsers.map(id => ({ userId: id, amount: share }));
+                }
+            }
+            // If 'none', splits is empty
+
             await createTripTransaction({
-                amount: parseFloat(expenseAmount),
+                amount: amount,
                 date: activeItem?.date ? activeItem.date : new Date(),
                 description: expenseDesc || 'Trip Expense',
                 type: 'expense',
@@ -121,6 +193,9 @@ export function ItineraryTimeline({ items, categories = [], tripId }: ItineraryT
                 tripId: activeTripId,
                 tripItineraryId: activeDayId,
                 isCredit: false,
+                payers, // Pass payers array
+                // paidByUserId is ignored on backend if payers is present, but we can omit or pass null
+                splits,
             });
             toast.success('Expense added');
             handleCloseDialog();
@@ -529,6 +604,171 @@ export function ItineraryTimeline({ items, categories = [], tripId }: ItineraryT
                                     placeholder="What was this for?"
                                     className="mt-1.5"
                                 />
+                            </div>
+
+                            {/* Paid By */}
+                            <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                    <Label>Paid By</Label>
+                                    <div className="flex items-center space-x-2">
+                                        <Checkbox
+                                            id="multi-payer"
+                                            checked={isMultiPayer}
+                                            onCheckedChange={(checked) => {
+                                                setIsMultiPayer(!!checked);
+                                                // If switching to multi, maybe auto-set current user to full?
+                                                if (checked && Object.keys(multiPayerAmounts).length === 0) {
+                                                    setMultiPayerAmounts({ [payerId]: expenseAmount });
+                                                }
+                                            }}
+                                        />
+                                        <Label htmlFor="multi-payer" className="text-xs font-normal text-muted-foreground cursor-pointer">Multiple Payers</Label>
+                                    </div>
+                                </div>
+
+                                {!isMultiPayer ? (
+                                    <Select value={payerId} onValueChange={setPayerId}>
+                                        <SelectTrigger className="mt-1.5">
+                                            <SelectValue placeholder="Select payer" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {members.map(member => (
+                                                <SelectItem key={member.id} value={member.id}>
+                                                    <div className="flex items-center gap-2">
+                                                        <Avatar className="h-5 w-5">
+                                                            <AvatarImage src={member.image || undefined} />
+                                                            <AvatarFallback>{member.name?.[0] || 'U'}</AvatarFallback>
+                                                        </Avatar>
+                                                        <span>{member.name || member.email}</span>
+                                                    </div>
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                ) : (
+                                    <div className="space-y-2 border rounded-md p-2 max-h-[200px] overflow-y-auto bg-muted/20">
+                                        {members.map(member => {
+                                            const isPayer = Object.keys(multiPayerAmounts).includes(member.id);
+                                            return (
+                                                <div key={member.id} className="flex items-center gap-2">
+                                                    <Checkbox
+                                                        id={`payer-${member.id}`}
+                                                        checked={isPayer}
+                                                        onCheckedChange={(checked) => {
+                                                            const newMap = { ...multiPayerAmounts };
+                                                            if (checked) {
+                                                                newMap[member.id] = ''; // Init empty or 0
+                                                            } else {
+                                                                delete newMap[member.id];
+                                                            }
+                                                            setMultiPayerAmounts(newMap);
+                                                        }}
+                                                    />
+                                                    <div className="flex-1 flex items-center justify-between gap-2">
+                                                        <Label htmlFor={`payer-${member.id}`} className="flex items-center gap-2 cursor-pointer">
+                                                            <Avatar className="h-5 w-5">
+                                                                <AvatarImage src={member.image || undefined} />
+                                                                <AvatarFallback>{member.name?.[0] || 'U'}</AvatarFallback>
+                                                            </Avatar>
+                                                            <span className="text-sm font-normal">{member.name || member.email}</span>
+                                                        </Label>
+                                                        {isPayer && (
+                                                            <Input
+                                                                type="number"
+                                                                className="h-7 w-24 text-right"
+                                                                placeholder="0.00"
+                                                                value={multiPayerAmounts[member.id] || ''}
+                                                                onChange={(e) => {
+                                                                    setMultiPayerAmounts({
+                                                                        ...multiPayerAmounts,
+                                                                        [member.id]: e.target.value
+                                                                    });
+                                                                }}
+                                                            />
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                        <div className="flex justify-end pt-1 border-t mt-2">
+                                            <span className={cn(
+                                                "text-xs font-medium",
+                                                Math.abs(Object.values(multiPayerAmounts).reduce((sum, val) => sum + (parseFloat(val) || 0), 0) - (parseFloat(expenseAmount) || 0)) > 0.01
+                                                    ? "text-destructive"
+                                                    : "text-emerald-600"
+                                            )}>
+                                                Total Paid: {Object.values(multiPayerAmounts).reduce((sum, val) => sum + (parseFloat(val) || 0), 0).toFixed(2)} / {expenseAmount || '0.00'}
+                                            </span>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Split Type */}
+                            <div>
+                                <Label className="mb-2 block">Split</Label>
+                                <div className="flex gap-2 mb-3">
+                                    <Button
+                                        type="button"
+                                        variant={splitType === 'equal' ? 'default' : 'outline'}
+                                        size="sm"
+                                        onClick={() => setSplitType('equal')}
+                                        className="flex-1"
+                                    >
+                                        Everyone
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        variant={splitType === 'specific' ? 'default' : 'outline'}
+                                        size="sm"
+                                        onClick={() => setSplitType('specific')}
+                                        className="flex-1"
+                                    >
+                                        Specific
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        variant={splitType === 'none' ? 'default' : 'outline'}
+                                        size="sm"
+                                        onClick={() => setSplitType('none')}
+                                        className="flex-1"
+                                    >
+                                        Don't Split
+                                    </Button>
+                                </div>
+
+                                {splitType === 'equal' && (
+                                    <div className="text-xs text-muted-foreground p-2 bg-muted/50 rounded-md">
+                                        Split equally between {members.length} people (${(parseFloat(expenseAmount || '0') / (members.length || 1)).toFixed(2)}/person)
+                                    </div>
+                                )}
+
+                                {splitType === 'specific' && (
+                                    <div className="space-y-2 border rounded-md p-2 max-h-[150px] overflow-y-auto">
+                                        {members.map(member => (
+                                            <div key={member.id} className="flex items-center gap-2">
+                                                <Checkbox
+                                                    id={`split-${member.id}`}
+                                                    checked={selectedSplitUsers.includes(member.id)}
+                                                    onCheckedChange={(checked) => {
+                                                        if (checked) {
+                                                            setSelectedSplitUsers([...selectedSplitUsers, member.id]);
+                                                        } else {
+                                                            setSelectedSplitUsers(selectedSplitUsers.filter(id => id !== member.id));
+                                                        }
+                                                    }}
+                                                />
+                                                <Label htmlFor={`split-${member.id}`} className="flex items-center gap-2 cursor-pointer flex-1">
+                                                    <Avatar className="h-5 w-5">
+                                                        <AvatarImage src={member.image || undefined} />
+                                                        <AvatarFallback>{member.name?.[0] || 'U'}</AvatarFallback>
+                                                    </Avatar>
+                                                    <span className="text-sm font-normal">{member.name || member.email}</span>
+                                                </Label>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                         </div>
                         <DialogFooter>

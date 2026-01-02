@@ -144,11 +144,25 @@ export async function getTrip(tripId: string) {
     const trip = await db.query.trips.findFirst({
         where: eq(trips.id, tripId),
         with: {
+            user: true, // Fetch creator
             itineraries: {
                 orderBy: (itineraries, { asc }) => [asc(itineraries.dayNumber)],
                 with: {
                     tripTransactions: {
-                        where: (utils, { eq }) => eq(utils.isDeleted, false)
+                        where: (utils, { eq }) => eq(utils.isDeleted, false),
+                        with: {
+                            paidByUser: true,
+                            splits: {
+                                with: {
+                                    user: true
+                                }
+                            },
+                            payers: { // Fetch payers
+                                with: {
+                                    user: true
+                                }
+                            }
+                        }
                     },
                     notes: true,
                     checklists: true,
@@ -321,7 +335,10 @@ export async function createTripTransaction(data: {
     categoryId?: string;
     description?: string;
     isCredit?: boolean;
-    order?: number;
+
+    splits?: { userId: string; amount: number }[];
+    paidByUserId?: string; // Legacy/Single payer fallback
+    payers?: { userId: string; amount: number }[];
 }) {
     const session = await auth.api.getSession({
         headers: await headers()
@@ -329,14 +346,51 @@ export async function createTripTransaction(data: {
 
     if (!session?.user?.id) throw new Error('Unauthorized');
 
-    const [transaction] = await db.insert(schema.tripTransactions).values({
-        ...data,
-        amount: data.amount.toString(),
-        userId: session.user.id,
-    }).returning();
+    // Determine payers: prioritize explicit payers array, fallback to paidByUserId (single payer full amount)
+    let finalPayers = data.payers || [];
+    if (finalPayers.length === 0 && data.paidByUserId) {
+        finalPayers = [{ userId: data.paidByUserId, amount: data.amount }];
+    }
+    // If absolutely no payer data, default to creator? Or let it fail/be handled? 
+    // For now, let's assume valid data provided or fallback to creator as single payer if purely empty
+    if (finalPayers.length === 0) {
+        finalPayers = [{ userId: session.user.id, amount: data.amount }];
+    }
+
+    // Use transaction to ensure consistency
+    const result = await db.transaction(async (tx) => {
+        const [transaction] = await tx.insert(schema.tripTransactions).values({
+            ...data,
+            amount: data.amount.toString(),
+            userId: session.user.id,
+            paidByUserId: data.paidByUserId || finalPayers[0]?.userId, // Keep populating for compatibility if needed/easy
+        }).returning();
+
+        if (data.splits && data.splits.length > 0) {
+            await tx.insert(schema.tripTransactionSplits).values(
+                data.splits.map(split => ({
+                    tripTransactionId: transaction.id,
+                    userId: split.userId,
+                    amount: split.amount.toString(),
+                }))
+            );
+        }
+
+        if (finalPayers.length > 0) {
+            await tx.insert(schema.tripTransactionPayers).values(
+                finalPayers.map(payer => ({
+                    tripTransactionId: transaction.id,
+                    userId: payer.userId,
+                    amount: payer.amount.toString(),
+                }))
+            );
+        }
+
+        return transaction;
+    });
 
     revalidatePath('/splitlog/[tripId]');
-    return transaction;
+    return result;
 }
 
 export async function updateTripTransaction(id: string, data: {
@@ -346,6 +400,9 @@ export async function updateTripTransaction(id: string, data: {
     categoryId?: string;
     description?: string;
     isCredit?: boolean;
+    splits?: { userId: string; amount: number }[];
+    paidByUserId?: string;
+    payers?: { userId: string; amount: number }[];
 }) {
     const session = await auth.api.getSession({
         headers: await headers()
@@ -353,15 +410,59 @@ export async function updateTripTransaction(id: string, data: {
 
     if (!session?.user?.id) throw new Error('Unauthorized');
 
-    const [transaction] = await db.update(schema.tripTransactions)
-        .set({
+    const result = await db.transaction(async (tx) => {
+        // Prepare update data
+        const updateData: any = {
             ...data,
             amount: data.amount ? data.amount.toString() : undefined,
-            updatedAt: new Date()
-        })
-        .where(eq(schema.tripTransactions.id, id))
-        .returning();
+            updatedAt: new Date(),
+        };
+
+        // Update legacy paidByUserId if implicit in single-payer update
+        if (data.paidByUserId) {
+            updateData.paidByUserId = data.paidByUserId;
+        }
+
+        const [transaction] = await tx.update(schema.tripTransactions)
+            .set(updateData)
+            .where(eq(schema.tripTransactions.id, id))
+            .returning();
+
+        if (data.splits) {
+            // Simple replace strategy: delete all for this transaction and re-insert
+            await tx.delete(schema.tripTransactionSplits)
+                .where(eq(schema.tripTransactionSplits.tripTransactionId, id));
+
+            if (data.splits.length > 0) {
+                await tx.insert(schema.tripTransactionSplits).values(
+                    data.splits.map(split => ({
+                        tripTransactionId: id,
+                        userId: split.userId,
+                        amount: split.amount.toString(),
+                    }))
+                );
+            }
+        }
+
+        if (data.payers) {
+            // Simple replace strategy for payers too
+            await tx.delete(schema.tripTransactionPayers)
+                .where(eq(schema.tripTransactionPayers.tripTransactionId, id));
+
+            if (data.payers.length > 0) {
+                await tx.insert(schema.tripTransactionPayers).values(
+                    data.payers.map(payer => ({
+                        tripTransactionId: id,
+                        userId: payer.userId,
+                        amount: payer.amount.toString(),
+                    }))
+                );
+            }
+        }
+
+        return transaction;
+    });
 
     revalidatePath('/splitlog/[tripId]');
-    return transaction;
+    return result;
 }

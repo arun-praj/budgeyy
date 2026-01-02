@@ -11,6 +11,11 @@ import { AvatarConfig } from '@/components/avatars/notion-avatar/types';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { TripNotes } from '@/components/trips/trip-notes';
 import { ItineraryTimeline } from '@/components/trips/itinerary-timeline';
+import { auth } from '@/lib/auth';
+import { headers } from 'next/headers';
+import { db } from '@/db';
+import { users } from '@/db/schema';
+import { inArray, eq } from 'drizzle-orm';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,9 +27,12 @@ interface TripDetailsPageProps {
 
 export default async function TripDetailsPage(props: TripDetailsPageProps) {
     const params = await props.params;
+    const session = await auth.api.getSession({
+        headers: await headers()
+    });
     const trip = await getTrip(params.tripId);
 
-    if (!trip) {
+    if (!trip || !session?.user) {
         notFound();
     }
 
@@ -33,19 +41,39 @@ export default async function TripDetailsPage(props: TripDetailsPageProps) {
         ? { backgroundImage: `url(${trip.imageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' }
         : { background: 'linear-gradient(to right, #4facfe 0%, #00f2fe 100%)' };
 
-    // Placeholder for user avatar config
-    const getAvatarConfig = (seed: string) => ({
-        body: 0,
-        eyebrows: 0,
-        eyes: 0,
-        glass: 0,
-        hair: 0,
-        mouth: 0,
-        accessory: 0,
-        face: 0,
-        beard: 0,
-        detail: 0
-    });
+    // Helper to parse avatar config
+    const getAvatarConfig = (avatarJson: string | null): AvatarConfig => {
+        if (!avatarJson) return {
+            body: 0, eyebrows: 0, eyes: 0, glass: 0, hair: 0, mouth: 0,
+            accessory: 0, face: 0, beard: 0, detail: 0
+        };
+        try {
+            return JSON.parse(avatarJson);
+        } catch {
+            return {
+                body: 0, eyebrows: 0, eyes: 0, glass: 0, hair: 0, mouth: 0,
+                accessory: 0, face: 0, beard: 0, detail: 0
+            };
+        }
+    };
+
+
+
+    // Fetch members (Creator + Accepted Invitees)
+    const acceptedEmails = trip.invites
+        .filter(i => i.status === 'accepted')
+        .map(i => i.email);
+
+    let memberUsers = [trip.user]; // Start with creator
+
+    if (acceptedEmails.length > 0) {
+        const invitedUsers = await db.query.users.findMany({
+            where: inArray(users.email, acceptedEmails)
+        });
+        // Avoid duplicates if creator invited themselves (unlikely but possible)
+        const invitedUnique = invitedUsers.filter(u => u.id !== trip.userId);
+        memberUsers = [...memberUsers, ...invitedUnique];
+    }
 
     return (
         <div className="min-h-screen bg-background pb-20">
@@ -79,17 +107,17 @@ export default async function TripDetailsPage(props: TripDetailsPageProps) {
 
                     {/* Members with Notion Icons */}
                     <div className="flex items-center gap-4">
-                        <div className="flex -space-x-3 hover:space-x-1 transition-all">
+                        <div className="flex -space-x-3 transition-all">
                             <TooltipProvider>
                                 {/* Creator */}
                                 <Tooltip>
                                     <TooltipTrigger>
                                         <div className="h-10 w-10 rounded-full border-2 border-background bg-muted overflow-hidden">
-                                            <NotionAvatar config={getAvatarConfig('creator')} className="h-full w-full" />
+                                            <NotionAvatar config={getAvatarConfig(trip.user.avatar)} className="h-full w-full" />
                                         </div>
                                     </TooltipTrigger>
                                     <TooltipContent>
-                                        <p>Creator</p>
+                                        <p>{trip.user.name || 'Creator'} (Creator)</p>
                                     </TooltipContent>
                                 </Tooltip>
 
@@ -161,7 +189,12 @@ export default async function TripDetailsPage(props: TripDetailsPageProps) {
                                 </Button>
                             </div>
 
-                            <ItineraryTimeline items={trip.itineraries} tripId={trip.id} />
+                            <ItineraryTimeline
+                                items={trip.itineraries}
+                                tripId={trip.id}
+                                members={memberUsers}
+                                currentUser={session.user}
+                            />
                         </TabsContent>
 
                         <TabsContent value="expenses">
