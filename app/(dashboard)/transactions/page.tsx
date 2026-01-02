@@ -108,6 +108,16 @@ async function TransactionsContent({ searchParams }: { searchParams: Promise<{ [
                 <TransactionFilters categories={categories} />
             </div>
 
+            {/* DEBUG INFO - TEMPORARY */}
+            <div className="bg-yellow-100 p-2 text-xs font-mono mb-4 rounded text-black border border-yellow-300">
+                <p><strong>Debug Info:</strong></p>
+                <p>Calendar: {calendar}</p>
+                <p>Range Mode: {range}</p>
+                <p>Start Date: {start.toString()}</p>
+                <p>End Date: {end.toString()}</p>
+                <p>Results: {transactions.length}</p>
+            </div>
+
             <TransactionsList transactions={transactions} currency={currency} calendar={calendar} />
 
             <div className="mt-4 flex justify-center">
