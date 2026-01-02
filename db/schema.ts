@@ -215,6 +215,7 @@ export const budgets = pgTable('budgets', {
 export const itineraryNotes = pgTable('itinerary_notes', {
     id: uuid('id').primaryKey().defaultRandom(),
     tripItineraryId: uuid('trip_itinerary_id').notNull().references(() => tripItineraries.id, { onDelete: 'cascade' }),
+    userId: text('user_id').references(() => users.id, { onDelete: 'cascade' }), // Added userId
     content: text('content').notNull(),
     isHighPriority: boolean('is_high_priority').default(false),
     order: integer('order').default(0),
@@ -226,6 +227,7 @@ export const itineraryNotes = pgTable('itinerary_notes', {
 export const itineraryChecklists = pgTable('itinerary_checklists', {
     id: uuid('id').primaryKey().defaultRandom(),
     tripItineraryId: uuid('trip_itinerary_id').notNull().references(() => tripItineraries.id, { onDelete: 'cascade' }),
+    userId: text('user_id').references(() => users.id, { onDelete: 'cascade' }), // Added userId
     title: text('title').notNull(),
     items: text('items').default('[]'), // JSON array of checklist items
     order: integer('order').default(0),
@@ -287,12 +289,20 @@ export const itineraryNotesRelations = relations(itineraryNotes, ({ one }) => ({
         fields: [itineraryNotes.tripItineraryId],
         references: [tripItineraries.id],
     }),
+    user: one(users, { // Added user relation
+        fields: [itineraryNotes.userId],
+        references: [users.id],
+    }),
 }));
 
 export const itineraryChecklistsRelations = relations(itineraryChecklists, ({ one }) => ({
     itinerary: one(tripItineraries, {
         fields: [itineraryChecklists.tripItineraryId],
         references: [tripItineraries.id],
+    }),
+    user: one(users, { // Added user relation
+        fields: [itineraryChecklists.userId],
+        references: [users.id],
     }),
 }));
 

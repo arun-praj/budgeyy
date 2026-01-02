@@ -6,7 +6,7 @@ import { MapPin, StickyNote, CheckSquare, MoreHorizontal, Pencil, Plus, DollarSi
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { updateItineraryDay, createItineraryNote, updateItineraryNote, createItineraryChecklist, updateItineraryChecklist, deleteItineraryNote, deleteItineraryChecklist, deleteTripTransaction, createTripTransaction, updateTripDates, deleteItineraryDay } from '@/actions/trips';
+import { updateItineraryDay, createItineraryNote, updateItineraryNote, createItineraryChecklist, updateItineraryChecklist, deleteItineraryNote, deleteItineraryChecklist, deleteTripTransaction, createTripTransaction, updateTripTransaction, updateTripDates, deleteItineraryDay } from '@/actions/trips';
 import { reorderItineraryItems } from '@/actions/dnd';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { toast } from 'sonner';
@@ -54,10 +54,26 @@ interface ItineraryTimelineProps {
     categories?: any[];
     tripId: string;
     members: { id: string; name: string | null; email: string; image?: string | null; isGuest?: boolean }[];
-    currentUser: { id: string; name?: string | null; email: string; image?: string | null };
+    currentUser: { id: string; name?: string | null; email: string; image?: string | null; currency?: string | null };
     startDate: Date | null;
     endDate: Date | null;
 }
+
+// Helper to parse avatar config
+const getAvatarConfig = (avatarJson: string | null | undefined): AvatarConfig => {
+    if (!avatarJson) return {
+        body: 0, eyebrows: 0, eyes: 0, glass: 0, hair: 0, mouth: 0,
+        accessory: 0, face: 0, beard: 0, detail: 0
+    };
+    try {
+        return JSON.parse(avatarJson);
+    } catch {
+        return {
+            body: 0, eyebrows: 0, eyes: 0, glass: 0, hair: 0, mouth: 0,
+            accessory: 0, face: 0, beard: 0, detail: 0
+        };
+    }
+};
 
 export function ItineraryTimeline({ items, categories = [], tripId, members = [], currentUser, startDate, endDate }: ItineraryTimelineProps) {
     // ... (state lines 59-136 omitted for brevity, keeping same)
@@ -73,6 +89,11 @@ export function ItineraryTimeline({ items, categories = [], tripId, members = []
     const [isMultiPayer, setIsMultiPayer] = useState(false);
     const [multiPayerAmounts, setMultiPayerAmounts] = useState<Record<string, string>>({}); // userId -> amount string
 
+    // Edit Mode State
+    const [editingTransactionId, setEditingTransactionId] = useState<string | null>(null);
+
+
+
     useEffect(() => {
         if (members.length > 0) {
             setSelectedSplitUsers(members.map(m => m.id));
@@ -80,20 +101,6 @@ export function ItineraryTimeline({ items, categories = [], tripId, members = []
     }, [members]);
 
     // Helper to parse avatar config
-    const getAvatarConfig = useCallback((avatarJson: string | null | undefined): AvatarConfig => {
-        if (!avatarJson) return {
-            body: 0, eyebrows: 0, eyes: 0, glass: 0, hair: 0, mouth: 0,
-            accessory: 0, face: 0, beard: 0, detail: 0
-        };
-        try {
-            return JSON.parse(avatarJson);
-        } catch {
-            return {
-                body: 0, eyebrows: 0, eyes: 0, glass: 0, hair: 0, mouth: 0,
-                accessory: 0, face: 0, beard: 0, detail: 0
-            };
-        }
-    }, []);
 
 
     // Inline Note Creation State
@@ -134,6 +141,17 @@ export function ItineraryTimeline({ items, categories = [], tripId, members = []
         setActiveDayId(null);
         setActiveTripId(null);
         setIsSubmitting(false);
+        setEditingTransactionId(null);
+        // Clean forms
+        setChecklistTitle('');
+        setExpenseAmount('');
+        setExpenseDesc('');
+        setExpenseCategory('');
+        setPayerId(currentUser?.id || '');
+        setSplitType('equal');
+        setSelectedSplitUsers(members.map(m => m.id));
+        setIsMultiPayer(false);
+        setMultiPayerAmounts({});
     };
 
     const handleClosePendingNote = () => {
@@ -141,6 +159,9 @@ export function ItineraryTimeline({ items, categories = [], tripId, members = []
     }
 
     const activeItem = items.find(i => i.id === activeDayId);
+
+    // Currency Helper
+    const userCurrency = currentUser?.currency || 'USD';
 
     const handleSubmitChecklist = async () => {
         if (!activeDayId || !checklistTitle.trim()) return;
@@ -226,26 +247,101 @@ export function ItineraryTimeline({ items, categories = [], tripId, members = []
             }
             // If 'none', splits is empty
 
-            await createTripTransaction({
-                amount: amount,
-                date: activeItem?.date ? activeItem.date : new Date(),
-                description: expenseDesc || 'Trip Expense',
-                type: 'expense',
-                categoryId: expenseCategory || undefined,
-                tripId: activeTripId,
-                tripItineraryId: activeDayId,
-                isCredit: false,
-                payers, // Pass mixed payers array
-                // Legacy paidByUserId is optional, backend handles payers array now
-                // We can strictly rely on passing `payers`
-                splits,
-            });
-            toast.success('Expense added');
+            // If 'none', splits is empty
+
+            if (editingTransactionId) {
+                // UPDATE
+                await updateTripTransaction(editingTransactionId, {
+                    amount: amount,
+                    date: activeItem?.date ? activeItem.date : new Date(), // Keep date logic or allow date edit? simplified for now
+                    description: expenseDesc || 'Trip Expense',
+                    type: 'expense',
+                    categoryId: expenseCategory || undefined,
+                    isCredit: false,
+                    payers,
+                    splits,
+                    // Legacy for update handled in action if needed
+                });
+                toast.success('Expense updated');
+            } else {
+                // CREATE
+                await createTripTransaction({
+                    amount: amount,
+                    date: activeItem?.date ? activeItem.date : new Date(),
+                    description: expenseDesc || 'Trip Expense',
+                    type: 'expense',
+                    categoryId: expenseCategory || undefined,
+                    tripId: activeTripId,
+                    tripItineraryId: activeDayId,
+                    isCredit: false,
+                    payers, // Pass mixed payers array
+                    // Legacy paidByUserId is optional, backend handles payers array now
+                    // We can strictly rely on passing `payers`
+                    splits,
+                });
+                toast.success('Expense added');
+            }
             handleCloseDialog();
         } catch (error) {
-            toast.error('Failed to add expense');
+            toast.error(editingTransactionId ? 'Failed to update expense' : 'Failed to add expense');
         } finally {
             setIsSubmitting(false);
+        }
+    };
+
+    const handleEditTransaction = (transaction: any) => {
+        // Populate form
+        setEditingTransactionId(transaction.id);
+        setExpenseAmount(transaction.amount);
+        setExpenseDesc(transaction.description || '');
+        setExpenseCategory(transaction.categoryId || '');
+        setDialogType('expense');
+        setActiveDayId(transaction.tripItineraryId);
+        setActiveTripId(transaction.tripId);
+
+        // Set Payers
+        if (transaction.payers && transaction.payers.length > 0) {
+            if (transaction.payers.length > 1) {
+                setIsMultiPayer(true);
+                const amounts: Record<string, string> = {};
+                transaction.payers.forEach((p: any) => {
+                    const id = p.userId || (p.guestId ? `guest_${p.guestId}` : '');
+                    if (id) amounts[id] = p.amount;
+                });
+                setMultiPayerAmounts(amounts);
+            } else {
+                setIsMultiPayer(false);
+                const p = transaction.payers[0];
+                const id = p.userId || (p.guestId ? `guest_${p.guestId}` : '');
+                if (id) setPayerId(id);
+            }
+        } else {
+            // Legacy fallback
+            setIsMultiPayer(false);
+            if (transaction.paidByUserId) setPayerId(transaction.paidByUserId);
+            else if (transaction.paidByGuestId) setPayerId(`guest_${transaction.paidByGuestId}`);
+        }
+
+        // Set Splits
+        if (transaction.splits && transaction.splits.length > 0) {
+            // Determine split type based on splits. 
+            // If all equal -> 'equal'. If subset -> 'specific'.
+            // Simplification: default to 'specific' if subset, else 'equal' if amounts match equal share
+            // For now, let's just populate 'specific' with selected users if it was specific.
+            // Or 'equal' with all users.
+
+            // Check if all members are in splits
+            const splitUserIds = transaction.splits.map((s: any) => s.userId || (s.guestId ? `guest_${s.guestId}` : ''));
+            setSelectedSplitUsers(splitUserIds.filter(Boolean));
+
+            if (splitUserIds.length === members.length) {
+                // Check if amounts roughly equal
+                // If editing complex splits, we might need more logic. 
+                // Assuming 'equal' for full group or 'specific' for subset for this MVP.
+                setSplitType('equal');
+            } else {
+                setSplitType('specific');
+            }
         }
     };
 
@@ -501,38 +597,119 @@ export function ItineraryTimeline({ items, categories = [], tripId, members = []
                                                             </div>
 
                                                             {/* Render Content Based on Type */}
+                                                            {/* Render Content Based on Type */}
                                                             {unifiedItem.type === 'transaction' && (
-                                                                <div className="flex items-start gap-3 relative p-3 rounded-lg border bg-card/40 hover:bg-card/60 transition-colors">
-                                                                    {/* Thread Line */}
-                                                                    <div className="absolute -left-10 top-0 h-[13px] w-10 border-b-2 border-l-2 border-gray-200 dark:border-gray-800 rounded-bl-xl" />
+                                                                (() => {
+                                                                    // Helper to generator natural language description
+                                                                    const t = unifiedItem.data;
+                                                                    const getMemberName = (id: string, isGuest: boolean = false) => {
+                                                                        const m = members.find(mem => mem.id === id);
+                                                                        return m ? (m.name || m.email.split('@')[0]) : 'Unknown';
+                                                                    };
 
-                                                                    <div className="h-6 w-6 rounded-full bg-blue-50 dark:bg-blue-900/20 text-blue-600 flex items-center justify-center shrink-0 text-[10px]">
-                                                                        $
-                                                                    </div>
-                                                                    <div className="flex-1 text-sm flex justify-between items-start">
-                                                                        <div>
-                                                                            <div className="font-medium flex items-center gap-2">
-                                                                                {unifiedItem.data.description || 'Expense'}
-                                                                                {unifiedItem.data.createdAt && (
-                                                                                    <span className="text-[10px] text-muted-foreground/60 font-normal">
-                                                                                        {format(new Date(unifiedItem.data.createdAt), 'h:mm a')}
-                                                                                    </span>
-                                                                                )}
+                                                                    // 1. Payers
+                                                                    let payerText = '';
+                                                                    const payers = t.payers || [];
+                                                                    if (payers.length > 0) {
+                                                                        const names = payers.map((p: any) => p.user ? (p.user.name || p.user.email.split('@')[0]) : (p.paidByUser?.name || p.paidByUser?.email?.split('@')[0] || 'Unknown'));
+                                                                        // Fallback to old paidByUser if payers empty (legacy) or use logic
+                                                                        if (names.length === 1) payerText = names[0];
+                                                                        else if (names.length === 2) payerText = `${names[0]} and ${names[1]}`;
+                                                                        else payerText = `${names[0]}, ${names[1]} & ${names.length - 2} others`;
+                                                                    } else if (t.paidByUser) {
+                                                                        payerText = t.paidByUser.name || t.paidByUser.email.split('@')[0];
+                                                                    } else {
+                                                                        payerText = 'Unknown';
+                                                                    }
+
+                                                                    // 2. Splits
+                                                                    let splitText = '';
+                                                                    const splits = t.splits || [];
+                                                                    if (splits.length > 0) {
+                                                                        // Check if equal check needed? For now just list names or "everyone"
+                                                                        // If split count == member count -> "everyone" (if simple enough)
+                                                                        // But user asked for "split by rosan, rodip... equally"
+
+                                                                        // Let's list names.
+                                                                        const splitNames = splits.map((s: any) => {
+                                                                            if (s.user) return s.user.name || s.user.email.split('@')[0];
+                                                                            // Handle guests if relations usually populated?
+                                                                            // The UnifiedItem might not have deep relations for splits->user if not eager loaded properly in previous getTrip
+                                                                            // But getTrip had: splits: { with: { user: true } }
+                                                                            return s.user ? (s.user.name || s.user.email.split('@')[0]) : 'Unknown';
+                                                                        });
+
+                                                                        if (splitNames.length === members.length && members.length > 3) {
+                                                                            splitText = 'everyone';
+                                                                        } else {
+                                                                            if (splitNames.length === 1) splitText = splitNames[0];
+                                                                            else if (splitNames.length === 2) splitText = `${splitNames[0]} and ${splitNames[1]}`;
+                                                                            else if (splitNames.length === 3) splitText = `${splitNames[0]}, ${splitNames[1]} and ${splitNames[2]}`;
+                                                                            else splitText = `${splitNames[0]}, ${splitNames[1]} & ${splitNames.length - 2} others`;
+                                                                        }
+                                                                    } else {
+                                                                        splitText = 'everyone'; // Default if no explicit splits? Or 'pending'?
+                                                                    }
+
+                                                                    // 3. Time
+                                                                    const timeText = t.date ? format(new Date(t.date), 'h:mm a') : '';
+
+                                                                    return (
+                                                                        <div
+                                                                            className="flex items-start gap-3 relative p-3 rounded-lg border border-blue-200/50 bg-blue-50/30 dark:bg-blue-900/10 dark:border-blue-800/30 hover:bg-blue-50/60 dark:hover:bg-blue-900/20 transition-colors cursor-pointer group/card"
+                                                                            onClick={() => handleEditTransaction(t)}
+                                                                        >
+                                                                            {/* Thread Line */}
+                                                                            <div className="absolute -left-10 top-0 h-[13px] w-10 border-b-2 border-l-2 border-gray-200 dark:border-gray-800 rounded-bl-xl" />
+
+                                                                            <div className="h-6 w-6 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 text-[10px] font-bold border border-blue-200 dark:border-blue-800">
+                                                                                $
                                                                             </div>
-                                                                            <div className="text-xs text-muted-foreground">
-                                                                                {unifiedItem.data.amount}
+                                                                            <div className="flex-1 text-sm flex justify-between items-start">
+                                                                                <div>
+                                                                                    <div className="font-normal text-foreground/90 leading-relaxed">
+                                                                                        <span className="font-semibold text-foreground">{payerText}</span>
+                                                                                        <span className="text-muted-foreground"> paid </span>
+                                                                                        <span className="font-bold text-emerald-600 dark:text-emerald-400">{userCurrency} {t.amount}</span>
+                                                                                        <span className="text-muted-foreground"> for </span>
+                                                                                        <span className="font-medium text-foreground">{t.description || 'Expense'}</span>
+                                                                                        <span className="text-muted-foreground"> and split by </span>
+                                                                                        <span className="font-medium text-foreground">{splitText}</span>
+                                                                                        <span className="text-muted-foreground"> equally</span>
+                                                                                        {timeText && (
+                                                                                            <span className="text-muted-foreground/60 text-xs ml-1">
+                                                                                                at {timeText}
+                                                                                            </span>
+                                                                                        )}
+                                                                                    </div>
+                                                                                </div>
+
+                                                                                <div className="flex items-center gap-2 shrink-0 ml-2">
+                                                                                    {/* Avatar - Far Right */}
+                                                                                    {unifiedItem.data.user?.avatar && (
+                                                                                        <div className="h-5 w-5 rounded-full border bg-muted overflow-hidden shrink-0" title={unifiedItem.data.user.name || 'User'}>
+                                                                                            <NotionAvatar
+                                                                                                className="h-full w-full"
+                                                                                                config={getAvatarConfig(unifiedItem.data.user.avatar)}
+                                                                                            />
+                                                                                        </div>
+                                                                                    )}
+                                                                                    <Button
+                                                                                        variant="ghost"
+                                                                                        size="icon"
+                                                                                        className="h-6 w-6 opacity-0 group-hover/card:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
+                                                                                        onClick={(e) => {
+                                                                                            e.stopPropagation();
+                                                                                            handleDeleteTransaction(unifiedItem.id);
+                                                                                        }}
+                                                                                    >
+                                                                                        <Trash2 className="h-3 w-3" />
+                                                                                    </Button>
+                                                                                </div>
                                                                             </div>
                                                                         </div>
-                                                                        <Button
-                                                                            variant="ghost"
-                                                                            size="icon"
-                                                                            className="h-6 w-6 opacity-0 group-hover/item:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
-                                                                            onClick={() => handleDeleteTransaction(unifiedItem.id)}
-                                                                        >
-                                                                            <Trash2 className="h-3 w-3" />
-                                                                        </Button>
-                                                                    </div>
-                                                                </div>
+                                                                    );
+                                                                })()
                                                             )}
 
                                                             {unifiedItem.type === 'note' && (
@@ -542,6 +719,7 @@ export function ItineraryTimeline({ items, categories = [], tripId, members = []
                                                                     initialPriority={unifiedItem.data.isHighPriority}
                                                                     createdAt={unifiedItem.data.createdAt}
                                                                     onDelete={() => handleDeleteNote(unifiedItem.id)}
+                                                                    creator={unifiedItem.data.user} // Pass creator
                                                                 />
                                                             )}
 
@@ -549,6 +727,7 @@ export function ItineraryTimeline({ items, categories = [], tripId, members = []
                                                                 <ItineraryChecklistEditor
                                                                     checklist={unifiedItem.data}
                                                                     onDelete={() => handleDeleteChecklist(unifiedItem.id)}
+                                                                    creator={unifiedItem.data.user} // Pass creator
                                                                 />
                                                             )}
                                                         </div>
@@ -698,11 +877,11 @@ export function ItineraryTimeline({ items, categories = [], tripId, members = []
                 <Dialog open={dialogType === 'expense'} onOpenChange={(open) => !open && handleCloseDialog()}>
                     <DialogContent>
                         <DialogHeader>
-                            <DialogTitle>Add Expense</DialogTitle>
+                            <DialogTitle>{editingTransactionId ? 'Edit Expense' : 'Add Expense'}</DialogTitle>
                         </DialogHeader>
                         <div className="space-y-4 py-4">
                             <div>
-                                <Label>Amount</Label>
+                                <Label>Amount ({userCurrency})</Label>
                                 <Input
                                     type="number"
                                     value={expenseAmount}
@@ -885,12 +1064,14 @@ export function ItineraryTimeline({ items, categories = [], tripId, members = []
                         </div>
                         <DialogFooter>
                             <Button variant="outline" onClick={handleCloseDialog}>Cancel</Button>
-                            <Button onClick={handleSubmitExpense} disabled={isSubmitting}>Add Expense</Button>
+                            <Button onClick={handleSubmitExpense} disabled={isSubmitting}>
+                                {editingTransactionId ? 'Update Expense' : 'Add Expense'}
+                            </Button>
                         </DialogFooter>
                     </DialogContent>
                 </Dialog>
-            </div>
-        </DragDropContext>
+            </div >
+        </DragDropContext >
     );
 }
 
@@ -997,7 +1178,8 @@ function ItineraryNoteEditor({
     onCancel,
     onNoteCreated,
     onDelete,
-    createdAt
+    createdAt,
+    creator, // Destructure creator
 }: {
     id?: string;
     createdAt?: string | Date;
@@ -1008,6 +1190,7 @@ function ItineraryNoteEditor({
     onCancel?: () => void;
     onNoteCreated?: () => void;
     onDelete?: () => void;
+    creator?: { name?: string | null; email: string; avatar?: string | null }; // Add creator prop type
 }) {
     const [content, setContent] = useState(initialContent);
     const [isPriority, setIsPriority] = useState(initialPriority);
@@ -1112,6 +1295,15 @@ function ItineraryNoteEditor({
                                         {format(new Date(createdAt), 'h:mm a')}
                                     </span>
                                 )}
+                                {/* Creator Avatar */}
+                                {!isNew && creator?.avatar && (
+                                    <div className="h-4 w-4 rounded-full border bg-muted overflow-hidden shrink-0" title={creator.name || 'User'}>
+                                        <NotionAvatar
+                                            className="h-full w-full"
+                                            config={getAvatarConfig(creator.avatar)}
+                                        />
+                                    </div>
+                                )}
                             </div>
 
                             {/* Actions Container */}
@@ -1183,7 +1375,11 @@ function ItineraryNoteEditor({
 }
 
 // Checklist Editor Component
-function ItineraryChecklistEditor({ checklist, onDelete }: { checklist: any, onDelete: () => void }) {
+function ItineraryChecklistEditor({ checklist, onDelete, creator }: {
+    checklist: any,
+    onDelete: () => void,
+    creator?: { name?: string | null; email: string; avatar?: string | null } // Add creator prop
+}) {
     // Parse items safely
     const initialItems = useMemo(() => {
         try {
@@ -1256,6 +1452,15 @@ function ItineraryChecklistEditor({ checklist, onDelete }: { checklist: any, onD
                                 <span className="text-[10px] text-muted-foreground/60 font-medium font-normal">
                                     {format(new Date(checklist.createdAt), 'h:mm a')}
                                 </span>
+                            )}
+                            {/* Creator Avatar */}
+                            {creator?.avatar && (
+                                <div className="h-4 w-4 rounded-full border bg-muted overflow-hidden shrink-0" title={creator.name || 'User'}>
+                                    <NotionAvatar
+                                        className="h-full w-full"
+                                        config={getAvatarConfig(creator.avatar)}
+                                    />
+                                </div>
                             )}
                             {isSaving && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
                         </div>

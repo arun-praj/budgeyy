@@ -228,11 +228,20 @@ export async function getTrip(tripId: string) {
                                 with: {
                                     user: true
                                 }
-                            }
+                            },
+                            user: true // Fetch transaction creator
                         }
                     },
-                    notes: true,
-                    checklists: true,
+                    notes: {
+                        with: {
+                            user: true // Fetch note creator
+                        }
+                    },
+                    checklists: {
+                        with: {
+                            user: true // Fetch checklist creator
+                        }
+                    },
                 }
             },
             // Include invites
@@ -291,6 +300,7 @@ export async function createItineraryNote(itineraryId: string, content: string, 
         tripItineraryId: itineraryId,
         content,
         isHighPriority,
+        userId: session.user.id, // Save userId
     }).returning();
 
     revalidatePath('/splitlog/[tripId]');
@@ -328,6 +338,7 @@ export async function createItineraryChecklist(itineraryId: string, title: strin
         tripItineraryId: itineraryId,
         title,
         items: '[]',
+        userId: session.user.id, // Save userId
     });
 
     revalidatePath('/splitlog/[tripId]');
