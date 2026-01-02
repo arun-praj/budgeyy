@@ -161,7 +161,7 @@ export default async function TripDetailsPage(props: TripDetailsPageProps) {
 
                                 {/* Invited Members */}
                                 {trip.invites && trip.invites.map((invite) => {
-                                    const user = memberUsersMap.get(invite.email);
+                                    const user = memberUsersMap.get(invite.email.toLowerCase());
                                     const avatarConfig = getAvatarConfig(user?.avatar || invite.guestAvatar || null);
                                     const displayName = user?.name || invite.email;
                                     const isJoined = invite.status === 'accepted';
