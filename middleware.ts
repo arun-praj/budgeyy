@@ -30,9 +30,13 @@ export async function middleware(request: NextRequest) {
     }
 
     // Redirect authenticated users away from auth pages to onboarding or dashboard
-    if (hasSession && (pathname === '/login' || pathname === '/register')) {
-        // For simplicity, redirect to onboarding - the page will handle further logic
-        return NextResponse.redirect(new URL('/onboarding', request.url));
+    if (hasSession) {
+        if (pathname === '/login' || pathname === '/register') {
+            return NextResponse.redirect(new URL('/onboarding', request.url));
+        }
+        if (pathname === '/') {
+            return NextResponse.redirect(new URL('/dashboard', request.url));
+        }
     }
 
     return NextResponse.next();
