@@ -1,7 +1,10 @@
 import { notFound } from 'next/navigation';
 import { getTrip } from '@/actions/trips';
-import { format } from 'date-fns';
-import { MapPin, Calendar, Plus, Check } from 'lucide-react';
+import { MapPin, Plus, ArrowLeft } from 'lucide-react';
+import Link from 'next/link';
+import { BackgroundSelectorWrapper } from '@/components/trips/background-selector-wrapper';
+import { EditableTitle } from '@/components/trips/editable-title';
+import { EditableDateRange } from '@/components/trips/editable-date-range';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -121,6 +124,17 @@ export default async function TripDetailsPage(props: TripDetailsPageProps) {
                 style={headerStyle}
             >
                 <div className="absolute inset-0 bg-black/10" />
+
+                {/* Back Button - Top Left */}
+                <Link
+                    href="/splitlog"
+                    className="absolute top-4 left-4 z-20 bg-black/50 hover:bg-black/70 text-white rounded-full p-2 transition-colors backdrop-blur-sm"
+                >
+                    <ArrowLeft className="h-5 w-5" />
+                </Link>
+
+                {/* Edit Background Button - Top Right */}
+                <BackgroundSelectorWrapper tripId={params.tripId} currentImage={trip.imageUrl} />
             </div>
 
             <div className="container max-w-5xl mx-auto px-4 -mt-16 relative z-10">
@@ -128,19 +142,19 @@ export default async function TripDetailsPage(props: TripDetailsPageProps) {
                 <div className="bg-card rounded-xl shadow-lg border p-6 flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
 
                     {/* Title and Date on Bottom Left */}
-                    <div className="space-y-1">
-                        <Badge variant="outline" className="mb-2 bg-background/50 backdrop-blur-sm">
-                            <MapPin className="h-3 w-3 mr-1" />
-                            {trip.destination}
-                        </Badge>
-                        <h1 className="text-3xl md:text-4xl font-bold">{trip.name}</h1>
-                        <div className="flex items-center text-muted-foreground">
-                            <Calendar className="h-4 w-4 mr-2" />
-                            <span>
-                                {trip.startDate ? format(trip.startDate, 'MMM d') : 'No Date'}
-                                {trip.endDate ? ` - ${format(trip.endDate, 'MMM d, yyyy')}` : (trip.startDate ? `, ${format(trip.startDate, 'yyyy')}` : '')}
-                            </span>
+                    <div className="flex flex-col gap-2">
+                        <div>
+                            <Badge variant="outline" className="bg-background/50 backdrop-blur-sm">
+                                <MapPin className="h-3 w-3 mr-1" />
+                                {trip.destination}
+                            </Badge>
                         </div>
+                        <EditableTitle tripId={trip.id} initialName={trip.name} />
+                        <EditableDateRange
+                            tripId={trip.id}
+                            startDate={trip.startDate}
+                            endDate={trip.endDate}
+                        />
                     </div>
 
                     {/* Members with Notion Icons */}

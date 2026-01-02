@@ -303,6 +303,17 @@ export const tripInvitesRelations = relations(tripInvites, ({ one }) => ({
     }),
 }));
 
+export const budgetsRelations = relations(budgets, ({ one }) => ({
+    category: one(categories, {
+        fields: [budgets.categoryId],
+        references: [categories.id],
+    }),
+    user: one(users, {
+        fields: [budgets.userId],
+        references: [users.id],
+    }),
+}));
+
 // Update transactions relations in existing code to include trip
 export const transactionsRelations = relations(transactions, ({ one }) => ({
     user: one(users, {

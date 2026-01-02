@@ -3,7 +3,7 @@
 import { db } from '@/db';
 import { trips, tripTransactions } from '@/db/schema';
 import * as schema from '@/db/schema';
-import { eq, desc, and } from 'drizzle-orm';
+import { eq, desc, and, inArray } from 'drizzle-orm';
 import { auth } from '@/lib/auth';
 import { headers } from 'next/headers';
 import { revalidatePath } from 'next/cache';
@@ -479,4 +479,248 @@ export async function updateTripTransaction(id: string, data: {
 
     revalidatePath('/splitlog/[tripId]');
     return result;
+}
+
+export async function updateTripImage(tripId: string, imageUrl: string) {
+    const session = await auth.api.getSession({
+        headers: await headers()
+    });
+
+    if (!session?.user) {
+        throw new Error('Unauthorized');
+    }
+
+    // Verify trip belongs to user
+    const trip = await db.query.trips.findFirst({
+        where: eq(trips.id, tripId),
+    });
+
+    if (!trip || trip.userId !== session.user.id) {
+        throw new Error('Unauthorized');
+    }
+
+    const [updatedTrip] = await db.update(trips)
+        .set({ imageUrl })
+        .where(eq(trips.id, tripId))
+        .returning();
+
+    revalidatePath(`/splitlog/${tripId}`);
+    revalidatePath('/splitlog');
+
+    return updatedTrip;
+}
+
+export async function updateTripName(tripId: string, name: string) {
+    const session = await auth.api.getSession({
+        headers: await headers()
+    });
+
+    if (!session?.user) {
+        throw new Error('Unauthorized');
+    }
+
+    // Verify trip belongs to user
+    const trip = await db.query.trips.findFirst({
+        where: eq(trips.id, tripId),
+    });
+
+    if (!trip || trip.userId !== session.user.id) {
+        throw new Error('Unauthorized');
+    }
+
+    const [updatedTrip] = await db.update(trips)
+        .set({ name, updatedAt: new Date() })
+        .where(eq(trips.id, tripId))
+        .returning();
+
+    revalidatePath(`/splitlog/${tripId}`);
+    revalidatePath('/splitlog');
+
+    return updatedTrip;
+}
+
+export async function updateTripDates(tripId: string, startDate: Date, endDate?: Date) {
+    const session = await auth.api.getSession({
+        headers: await headers()
+    });
+
+    if (!session?.user) {
+        throw new Error('Unauthorized');
+    }
+
+    // Verify trip belongs to user
+    const trip = await db.query.trips.findFirst({
+        where: eq(trips.id, tripId),
+    });
+
+    if (!trip || trip.userId !== session.user.id) {
+        throw new Error('Unauthorized');
+    }
+
+    // Use transaction to update both trip and itineraries
+    await db.transaction(async (tx) => {
+        // Update trip dates
+        await tx.update(trips)
+            .set({
+                startDate,
+                endDate: endDate || null,
+                updatedAt: new Date()
+            })
+            .where(eq(trips.id, tripId));
+
+        // Get existing itineraries
+        const existingItineraries = await tx.query.tripItineraries.findMany({
+            where: eq(schema.tripItineraries.tripId, tripId),
+        });
+
+        // Calculate new date range
+        const newDatesMap = new Map<string, number>(); // dateStr -> dayNumber
+        let currentDate = new Date(startDate);
+        const end = endDate ? new Date(endDate) : new Date(startDate);
+        let dayCount = 1;
+
+        while (currentDate <= end) {
+            const dateStr = currentDate.toISOString().split('T')[0];
+            newDatesMap.set(dateStr, dayCount);
+            currentDate.setDate(currentDate.getDate() + 1);
+            dayCount++;
+        }
+
+        // Separate itineraries into: keep (update dayNumber) vs delete
+        const itinerariesToKeep: { id: string; dateStr: string; newDayNumber: number }[] = [];
+        const itineraryIdsToDelete: string[] = [];
+
+        for (const itinerary of existingItineraries) {
+            if (!itinerary.date) {
+                itineraryIdsToDelete.push(itinerary.id);
+                continue;
+            }
+
+            const dateStr = itinerary.date.toISOString().split('T')[0];
+            const newDayNumber = newDatesMap.get(dateStr);
+
+            if (newDayNumber !== undefined) {
+                // This date is in the new range - keep it and update dayNumber
+                itinerariesToKeep.push({ id: itinerary.id, dateStr, newDayNumber });
+            } else {
+                // This date is NOT in the new range - delete it
+                itineraryIdsToDelete.push(itinerary.id);
+            }
+        }
+
+        // Delete itineraries that are outside the new date range
+        if (itineraryIdsToDelete.length > 0) {
+            await tx.delete(schema.tripItineraries)
+                .where(and(
+                    eq(schema.tripItineraries.tripId, tripId),
+                    inArray(schema.tripItineraries.id, itineraryIdsToDelete)
+                ));
+        }
+
+        // Update dayNumber for kept itineraries
+        for (const item of itinerariesToKeep) {
+            await tx.update(schema.tripItineraries)
+                .set({ dayNumber: item.newDayNumber, updatedAt: new Date() })
+                .where(eq(schema.tripItineraries.id, item.id));
+        }
+
+        // Find which dates need new itineraries (dates in new range that don't already exist)
+        const existingDateStrs = new Set(itinerariesToKeep.map(i => i.dateStr));
+        const datesToCreate: { date: Date; dayNumber: number }[] = [];
+
+        currentDate = new Date(startDate);
+        dayCount = 1;
+        while (currentDate <= end) {
+            const dateStr = currentDate.toISOString().split('T')[0];
+            if (!existingDateStrs.has(dateStr)) {
+                datesToCreate.push({
+                    date: new Date(currentDate),
+                    dayNumber: dayCount,
+                });
+            }
+            currentDate.setDate(currentDate.getDate() + 1);
+            dayCount++;
+        }
+
+        // Create new itineraries for missing dates
+        if (datesToCreate.length > 0) {
+            await tx.insert(schema.tripItineraries).values(
+                datesToCreate.map(d => ({
+                    tripId: tripId,
+                    dayNumber: d.dayNumber,
+                    date: d.date,
+                    title: '',
+                }))
+            );
+        }
+    });
+
+    revalidatePath(`/splitlog/${tripId}`);
+    revalidatePath('/splitlog');
+
+    return { success: true };
+}
+
+export async function checkItineraryConflicts(tripId: string, newStartDate: Date, newEndDate?: Date) {
+    const session = await auth.api.getSession({
+        headers: await headers()
+    });
+
+    if (!session?.user) {
+        throw new Error('Unauthorized');
+    }
+
+    // Get existing itineraries with their content
+    const existingItineraries = await db.query.tripItineraries.findMany({
+        where: eq(schema.tripItineraries.tripId, tripId),
+        with: {
+            notes: true,
+            checklists: true,
+            tripTransactions: {
+                where: eq(schema.tripTransactions.isDeleted, false),
+            },
+        },
+    });
+
+    // Calculate which dates will be in the new range
+    const newDates = new Set<string>();
+    if (newStartDate) {
+        let currentDate = new Date(newStartDate);
+        const end = newEndDate ? new Date(newEndDate) : new Date(newStartDate);
+
+        while (currentDate <= end) {
+            newDates.add(currentDate.toISOString().split('T')[0]);
+            currentDate.setDate(currentDate.getDate() + 1);
+        }
+    }
+
+    // Find itineraries that have content AND will be deleted (not in new date range)
+    const affectedItineraries = existingItineraries.filter(itinerary => {
+        const hasContent =
+            (itinerary.notes && itinerary.notes.length > 0) ||
+            (itinerary.checklists && itinerary.checklists.length > 0) ||
+            (itinerary.tripTransactions && itinerary.tripTransactions.length > 0) ||
+            (itinerary.title && itinerary.title.trim() !== '') ||
+            (itinerary.location && itinerary.location.trim() !== '');
+
+        if (!hasContent) return false;
+
+        // Check if this date will be deleted
+        if (!itinerary.date) return false;
+        const itineraryDateStr = itinerary.date.toISOString().split('T')[0];
+        return !newDates.has(itineraryDateStr);
+    });
+
+    return {
+        hasConflicts: affectedItineraries.length > 0,
+        affectedDays: affectedItineraries.length,
+        affectedDates: affectedItineraries.map(it => ({
+            date: it.date,
+            dayNumber: it.dayNumber,
+            hasNotes: it.notes && it.notes.length > 0,
+            hasChecklists: it.checklists && it.checklists.length > 0,
+            hasTransactions: it.tripTransactions && it.tripTransactions.length > 0,
+            hasTitle: !!(it.title && it.title.trim() !== ''),
+        })),
+    };
 }
