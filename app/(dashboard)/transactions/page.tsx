@@ -26,7 +26,7 @@ import { Loader2 } from 'lucide-react';
 
 export default function TransactionsPage(props: TransactionsPageProps) {
     return (
-        <div className="space-y-6">
+        <div className="container mx-auto p-4 md:p-6 lg:p-8 pt-6 pb-24 md:pb-6 space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
                     <h1 className="text-3xl font-bold">Transactions</h1>

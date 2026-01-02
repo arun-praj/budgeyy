@@ -78,6 +78,7 @@ export default async function TripDetailsPage(props: TripDetailsPageProps) {
     // Start with creator
     let memberUsers: { id: string; name: string | null; email: string; image?: string | null; isGuest?: boolean }[] = [{
         ...trip.user,
+        image: trip.user.avatar,
         isGuest: false
     }];
 
@@ -93,6 +94,7 @@ export default async function TripDetailsPage(props: TripDetailsPageProps) {
             if (registeredUser.id !== trip.userId) {
                 memberUsers.push({
                     ...registeredUser,
+                    image: registeredUser.avatar, // Map avatar to image for consistency
                     isGuest: false
                 });
                 addedEmails.add(email);
@@ -115,7 +117,7 @@ export default async function TripDetailsPage(props: TripDetailsPageProps) {
         <div className="min-h-screen bg-background pb-20">
             {/* 1. Header Background (10% of screen approx) */}
             <div
-                className="relative h-[20vh] w-full"
+                className="relative h-[30vh] w-full"
                 style={headerStyle}
             >
                 <div className="absolute inset-0 bg-black/10" />

@@ -25,6 +25,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { User } from '@/db/schema';
+import { NotionAvatar } from '@/components/avatars/notion-avatar';
+import { AvatarConfig } from '@/components/avatars/notion-avatar/types';
 
 interface ItineraryItem {
     id: string;
@@ -74,6 +76,22 @@ export function ItineraryTimeline({ items, categories = [], tripId, members = []
             setSelectedSplitUsers(members.map(m => m.id));
         }
     }, [members]);
+
+    // Helper to parse avatar config
+    const getAvatarConfig = useCallback((avatarJson: string | null | undefined): AvatarConfig => {
+        if (!avatarJson) return {
+            body: 0, eyebrows: 0, eyes: 0, glass: 0, hair: 0, mouth: 0,
+            accessory: 0, face: 0, beard: 0, detail: 0
+        };
+        try {
+            return JSON.parse(avatarJson);
+        } catch {
+            return {
+                body: 0, eyebrows: 0, eyes: 0, glass: 0, hair: 0, mouth: 0,
+                accessory: 0, face: 0, beard: 0, detail: 0
+            };
+        }
+    }, []);
 
 
     // Inline Note Creation State
@@ -657,10 +675,9 @@ export function ItineraryTimeline({ items, categories = [], tripId, members = []
                                             {members.map(member => (
                                                 <SelectItem key={member.id} value={member.id}>
                                                     <div className="flex items-center gap-2">
-                                                        <Avatar className="h-5 w-5">
-                                                            <AvatarImage src={member.image || undefined} />
-                                                            <AvatarFallback>{member.name?.[0] || 'U'}</AvatarFallback>
-                                                        </Avatar>
+                                                        <div className="h-5 w-5 rounded-full border bg-muted overflow-hidden shrink-0">
+                                                            <NotionAvatar className="h-full w-full" config={getAvatarConfig(member.image)} />
+                                                        </div>
                                                         <span>{member.name || member.email}</span>
                                                     </div>
                                                 </SelectItem>
@@ -688,10 +705,9 @@ export function ItineraryTimeline({ items, categories = [], tripId, members = []
                                                     />
                                                     <div className="flex-1 flex items-center justify-between gap-2">
                                                         <Label htmlFor={`payer-${member.id}`} className="flex items-center gap-2 cursor-pointer">
-                                                            <Avatar className="h-5 w-5">
-                                                                <AvatarImage src={member.image || undefined} />
-                                                                <AvatarFallback>{member.name?.[0] || 'U'}</AvatarFallback>
-                                                            </Avatar>
+                                                            <div className="h-5 w-5 rounded-full border bg-muted overflow-hidden shrink-0">
+                                                                <NotionAvatar className="h-full w-full" config={getAvatarConfig(member.image)} />
+                                                            </div>
                                                             <span className="text-sm font-normal">{member.name || member.email}</span>
                                                         </Label>
                                                         {isPayer && (
@@ -766,7 +782,7 @@ export function ItineraryTimeline({ items, categories = [], tripId, members = []
                                 )}
 
                                 {splitType === 'specific' && (
-                                    <div className="space-y-2 border rounded-md p-2 max-h-[150px] overflow-y-auto">
+                                    <div className="space-y-2 border rounded-md p-2 max-h-[200px] overflow-y-auto bg-muted/20">
                                         {members.map(member => (
                                             <div key={member.id} className="flex items-center gap-2">
                                                 <Checkbox
@@ -781,10 +797,9 @@ export function ItineraryTimeline({ items, categories = [], tripId, members = []
                                                     }}
                                                 />
                                                 <Label htmlFor={`split-${member.id}`} className="flex items-center gap-2 cursor-pointer flex-1">
-                                                    <Avatar className="h-5 w-5">
-                                                        <AvatarImage src={member.image || undefined} />
-                                                        <AvatarFallback>{member.name?.[0] || 'U'}</AvatarFallback>
-                                                    </Avatar>
+                                                    <div className="h-5 w-5 rounded-full border bg-muted overflow-hidden shrink-0">
+                                                        <NotionAvatar className="h-full w-full" config={getAvatarConfig(member.image)} />
+                                                    </div>
                                                     <span className="text-sm font-normal">{member.name || member.email}</span>
                                                 </Label>
                                             </div>

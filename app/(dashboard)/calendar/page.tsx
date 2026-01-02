@@ -19,10 +19,12 @@ export default function CalendarPage(props: {
     searchParams: Promise<{ [key: string]: string | string[] | undefined }>
 }) {
     return (
-        <div className="flex flex-col h-[calc(100vh-theme(spacing.20))] space-y-4">
-            <Suspense fallback={<div className="h-full flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>}>
-                <CalendarContent searchParams={props.searchParams} />
-            </Suspense>
+        <div className="container mx-auto p-4 md:p-6 lg:p-8 pt-6 pb-24 md:pb-6">
+            <div className="flex flex-col h-[calc(100vh-theme(spacing.20))] space-y-4">
+                <Suspense fallback={<div className="h-full flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>}>
+                    <CalendarContent searchParams={props.searchParams} />
+                </Suspense>
+            </div>
         </div>
     );
 }
