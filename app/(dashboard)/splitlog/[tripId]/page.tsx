@@ -245,9 +245,6 @@ export default async function TripDetailsPage(props: TripDetailsPageProps) {
                         <TabsContent value="itinerary" className="space-y-6">
                             <div className="flex items-center justify-between">
                                 <h2 className="text-xl font-semibold">Itinerary</h2>
-                                <Button size="sm">
-                                    <Plus className="h-4 w-4 mr-1" /> Add Day
-                                </Button>
                             </div>
 
                             <ItineraryTimeline
@@ -255,6 +252,8 @@ export default async function TripDetailsPage(props: TripDetailsPageProps) {
                                 tripId={trip.id}
                                 members={memberUsers}
                                 currentUser={session.user}
+                                startDate={trip.startDate}
+                                endDate={trip.endDate}
                             />
                         </TabsContent>
 

@@ -1,12 +1,12 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { format } from 'date-fns';
-import { MapPin, StickyNote, CheckSquare, MoreHorizontal, Pencil, Plus, DollarSign, X, Trash2, Check, Loader2, AlertCircle, GripVertical } from 'lucide-react';
+import { format, addDays } from 'date-fns';
+import { MapPin, StickyNote, CheckSquare, MoreHorizontal, Pencil, Plus, DollarSign, X, Trash2, Check, Loader2, AlertCircle, GripVertical, ChevronDown } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { updateItineraryDay, createItineraryNote, updateItineraryNote, createItineraryChecklist, updateItineraryChecklist, deleteItineraryNote, deleteItineraryChecklist, deleteTripTransaction, createTripTransaction } from '@/actions/trips';
+import { updateItineraryDay, createItineraryNote, updateItineraryNote, createItineraryChecklist, updateItineraryChecklist, deleteItineraryNote, deleteItineraryChecklist, deleteTripTransaction, createTripTransaction, updateTripDates, deleteItineraryDay } from '@/actions/trips';
 import { reorderItineraryItems } from '@/actions/dnd';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { toast } from 'sonner';
@@ -55,9 +55,11 @@ interface ItineraryTimelineProps {
     tripId: string;
     members: { id: string; name: string | null; email: string; image?: string | null; isGuest?: boolean }[];
     currentUser: { id: string; name?: string | null; email: string; image?: string | null };
+    startDate: Date | null;
+    endDate: Date | null;
 }
 
-export function ItineraryTimeline({ items, categories = [], tripId, members = [], currentUser }: ItineraryTimelineProps) {
+export function ItineraryTimeline({ items, categories = [], tripId, members = [], currentUser, startDate, endDate }: ItineraryTimelineProps) {
     // ... (state lines 59-136 omitted for brevity, keeping same)
     // Add Item State
     const [activeDayId, setActiveDayId] = useState<string | null>(null);
@@ -103,6 +105,7 @@ export function ItineraryTimeline({ items, categories = [], tripId, members = []
     const [expenseDesc, setExpenseDesc] = useState('');
     const [expenseCategory, setExpenseCategory] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isAddingDay, setIsAddingDay] = useState(false);
 
 
     const handleOpenDialog = (type: 'checklist' | 'expense', dayId: string, tripId: string) => {
@@ -388,6 +391,23 @@ export function ItineraryTimeline({ items, categories = [], tripId, members = []
         // OR better yet, let me quickly verify `actions/dnd.ts` content to be 100% sure of the signature.
     };
 
+    const handleAddDay = async () => {
+        if (!startDate || !endDate) {
+            toast.error('Missing trip dates');
+            return;
+        }
+        setIsAddingDay(true);
+        try {
+            const newEndDate = addDays(new Date(endDate), 1);
+            await updateTripDates(tripId, startDate, newEndDate);
+            toast.success('Day added to trip');
+        } catch (error) {
+            toast.error('Failed to add day');
+        } finally {
+            setIsAddingDay(false);
+        }
+    };
+
     return (
         <DragDropContext onDragEnd={onDragEnd}>
             <div className="relative w-full space-y-0 pb-12">
@@ -422,6 +442,33 @@ export function ItineraryTimeline({ items, categories = [], tripId, members = []
                                     <div className="w-full">
                                         <ItineraryTitleEditor id={item.id} initialTitle={item.title} initialLocation={item.location} />
                                     </div>
+
+                                    {/* Menu - Absolute Top Right */}
+                                    <div className="absolute top-0 right-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:bg-muted">
+                                                    <MoreHorizontal className="h-4 w-4" />
+                                                </Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent align="end">
+                                                <DropdownMenuItem
+                                                    className="text-destructive focus:text-destructive cursor-pointer"
+                                                    onClick={async () => {
+                                                        try {
+                                                            await deleteItineraryDay(item.id);
+                                                            toast.success('Day deleted');
+                                                        } catch (error) {
+                                                            toast.error('Failed to delete day');
+                                                        }
+                                                    }}
+                                                >
+                                                    <Trash2 className="h-4 w-4 mr-2" />
+                                                    Delete Day
+                                                </DropdownMenuItem>
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
+                                    </div>
                                 </div>
 
                                 {/* Combined Droppable Zone */}
@@ -432,8 +479,8 @@ export function ItineraryTimeline({ items, categories = [], tripId, members = []
                                             {...provided.droppableProps}
                                             className={cn(
                                                 "relative transition-colors rounded-md p-2 -ml-2",
-                                                item.unifiedItems.length === 0 ? "min-h-[50px]" : "min-h-0",
-                                                snapshot.isDraggingOver ? "bg-muted/50" : "hover:bg-muted/10"
+                                                // Only add min-height if dragging over, otherwise collapse
+                                                snapshot.isDraggingOver ? "min-h-[50px] bg-muted/50" : "min-h-0 hover:bg-muted/10"
                                             )}
                                         >
                                             {item.unifiedItems.map((unifiedItem, index) => (
@@ -456,10 +503,6 @@ export function ItineraryTimeline({ items, categories = [], tripId, members = []
                                                             {/* Render Content Based on Type */}
                                                             {unifiedItem.type === 'transaction' && (
                                                                 <div className="flex items-start gap-3 relative p-3 rounded-lg border bg-card/40 hover:bg-card/60 transition-colors">
-                                                                    {/* Creation Time - keeping simplified for unified view */}
-                                                                    <div className="absolute -left-28 top-[1px] w-16 text-right text-[10px] text-muted-foreground/60 font-medium h-[13px] flex items-center justify-end">
-                                                                        {unifiedItem.data.createdAt ? format(new Date(unifiedItem.data.createdAt), 'h:mm a') : ''}
-                                                                    </div>
                                                                     {/* Thread Line */}
                                                                     <div className="absolute -left-10 top-0 h-[13px] w-10 border-b-2 border-l-2 border-gray-200 dark:border-gray-800 rounded-bl-xl" />
 
@@ -468,7 +511,14 @@ export function ItineraryTimeline({ items, categories = [], tripId, members = []
                                                                     </div>
                                                                     <div className="flex-1 text-sm flex justify-between items-start">
                                                                         <div>
-                                                                            <div className="font-medium">{unifiedItem.data.description || 'Expense'}</div>
+                                                                            <div className="font-medium flex items-center gap-2">
+                                                                                {unifiedItem.data.description || 'Expense'}
+                                                                                {unifiedItem.data.createdAt && (
+                                                                                    <span className="text-[10px] text-muted-foreground/60 font-normal">
+                                                                                        {format(new Date(unifiedItem.data.createdAt), 'h:mm a')}
+                                                                                    </span>
+                                                                                )}
+                                                                            </div>
                                                                             <div className="text-xs text-muted-foreground">
                                                                                 {unifiedItem.data.amount}
                                                                             </div>
@@ -507,8 +557,9 @@ export function ItineraryTimeline({ items, categories = [], tripId, members = []
                                             ))}
                                             {provided.placeholder}
 
-                                            {item.unifiedItems.length === 0 && (
-                                                <div className={cn("h-8 flex items-center justify-center text-xs text-muted-foreground/0 transition-all border-2 border-dashed border-transparent rounded-lg", snapshot.isDraggingOver && "text-muted-foreground/50 border-muted-foreground/20")}>
+                                            {/* Only show placeholder if dragging over AND empty */}
+                                            {item.unifiedItems.length === 0 && snapshot.isDraggingOver && (
+                                                <div className={cn("h-8 flex items-center justify-center text-xs text-muted-foreground/50 transition-all border-2 border-dashed border-muted-foreground/20 rounded-lg")}>
                                                     Drop items here
                                                 </div>
                                             )}
@@ -596,6 +647,30 @@ export function ItineraryTimeline({ items, categories = [], tripId, members = []
                         </div>
                     );
                 })}
+
+                {/* Add Day Button */}
+                <div className="flex group pt-4">
+                    {/* Timeline Line Placeholder */}
+                    <div className="flex flex-col items-center mr-6 opacity-0">
+                        <div className="w-8 h-8" />
+                    </div>
+
+                    <div className="flex-1 pb-10">
+                        <Button
+                            variant="ghost"
+                            className="w-full h-12 border-2 border-dashed border-muted hover:border-emerald-500/50 hover:bg-emerald-50/50 dark:hover:bg-emerald-900/10 text-muted-foreground hover:text-emerald-600 transition-all rounded-xl gap-2 group/btn"
+                            onClick={handleAddDay}
+                            disabled={isAddingDay}
+                        >
+                            {isAddingDay ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                                <Plus className="h-4 w-4 group-hover/btn:scale-110 transition-transform" />
+                            )}
+                            Add Another Day
+                        </Button>
+                    </div>
+                </div>
 
                 {/* Dialogs */}
 
@@ -938,6 +1013,8 @@ function ItineraryNoteEditor({
     const [isPriority, setIsPriority] = useState(initialPriority);
     const [noteId, setNoteId] = useState(id);
     const [status, setStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+    const [isExpanded, setIsExpanded] = useState(false);
+    const [isOverflowing, setIsOverflowing] = useState(false);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
 
     const [debouncedContent] = useDebounce(content, 1000);
@@ -945,7 +1022,14 @@ function ItineraryNoteEditor({
     useEffect(() => {
         if (textareaRef.current) {
             textareaRef.current.style.height = 'auto';
-            textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
+            const scrollHeight = textareaRef.current.scrollHeight;
+            textareaRef.current.style.height = scrollHeight + 'px';
+
+            if (scrollHeight > 80) { // Approx 3-4 lines
+                setIsOverflowing(true);
+            } else {
+                setIsOverflowing(false);
+            }
         }
     }, [content]);
 
@@ -989,13 +1073,6 @@ function ItineraryNoteEditor({
 
     return (
         <div className="relative group/item mb-3">
-            {/* Creation Time */}
-            {!isNew && createdAt && (
-                <div className="absolute -left-28 top-0 w-16 text-right text-[10px] text-muted-foreground/60 font-medium h-[22px] flex items-center justify-end">
-                    {format(new Date(createdAt), 'h:mm a')}
-                </div>
-            )}
-
             {/* Connector */}
             <div className="absolute -left-10 top-0 h-[22px] w-10 border-b-2 border-l-2 border-gray-200 dark:border-gray-800 rounded-bl-xl" />
 
@@ -1008,11 +1085,11 @@ function ItineraryNoteEditor({
                         : "bg-yellow-50/50 dark:bg-yellow-900/10 border-yellow-200/50 dark:border-yellow-900/30",
                     "hover:shadow-sm"
                 )}>
-                    {/* Icon - Flex Item, not absolute */}
+                    {/* Icon - Left Side */}
                     <div
                         onClick={togglePriority}
                         className={cn(
-                            "shrink-0 cursor-pointer transition-transform active:scale-95 hover:scale-110",
+                            "shrink-0 cursor-pointer transition-transform active:scale-95 hover:scale-110 mt-0.5",
                             isPriority ? "text-red-500" : "text-yellow-600/80"
                         )}
                         title="Toggle Priority"
@@ -1020,38 +1097,85 @@ function ItineraryNoteEditor({
                         {isPriority ? <AlertCircle className="h-4 w-4" /> : <StickyNote className="h-4 w-4" />}
                     </div>
 
-                    <Textarea
-                        ref={textareaRef}
-                        value={content}
-                        onChange={(e) => setContent(e.target.value)}
-                        placeholder="Write a note..."
-                        className={cn(
-                            "bg-transparent border-0 focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none p-0 text-sm h-auto resize-none leading-relaxed w-full placeholder:text-muted-foreground/60 focus:placeholder:text-muted-foreground/30 min-h-[22px]",
-                            "text-foreground/90" // Always normal weight
-                        )}
-                        rows={1}
-                        autoFocus={isNew}
-                        onBlur={() => {
-                            if (isNew && !content.trim() && onCancel) onCancel();
-                        }}
-                    />
+                    <div className="flex-1 min-w-0">
+                        {/* Header: Title + Time */}
+                        <div className="flex items-center justify-between mb-1.5 min-h-[20px]">
+                            <div className="flex items-center gap-2">
+                                <span className={cn(
+                                    "text-xs font-semibold flex items-center gap-1.5",
+                                    isPriority ? "text-red-600 dark:text-red-400" : "text-yellow-700 dark:text-yellow-500"
+                                )}>
+                                    {isPriority ? "Important" : "Note"}
+                                </span>
+                                {!isNew && createdAt && (
+                                    <span className="text-[10px] text-muted-foreground/60 font-medium">
+                                        {format(new Date(createdAt), 'h:mm a')}
+                                    </span>
+                                )}
+                            </div>
 
-                    {/* Status/Actions Absolute Top-Right */}
-                    <div className="absolute right-2 top-2 flex items-center gap-1">
-                        {status === 'saving' && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground/40" />}
-                        {status === 'saved' && <Check className="h-3 w-3 text-emerald-500/60" />}
+                            {/* Actions Container */}
+                            <div className="flex items-center gap-2">
 
-                        {!isNew && (
+                                {/* Status Icons */}
+                                {status === 'saving' && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground/40" />}
+                                {status === 'saved' && <Check className="h-3 w-3 text-emerald-500/60" />}
+
+                                {/* Delete Button */}
+                                {!isNew && (
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-5 w-5 opacity-0 group-hover/note:opacity-100 transition-all text-muted-foreground/40 hover:text-destructive hover:bg-transparent -mr-1"
+                                        onClick={onDelete}
+                                    >
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                    </Button>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="relative">
+                            <Textarea
+                                ref={textareaRef}
+                                value={content}
+                                onChange={(e) => {
+                                    setContent(e.target.value);
+                                    setIsExpanded(true);
+                                }}
+                                onFocus={() => setIsExpanded(true)}
+                                placeholder="Write a note..."
+                                className={cn(
+                                    "bg-transparent border-0 focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none p-0 text-sm resize-none leading-relaxed w-full placeholder:text-muted-foreground/60 focus:placeholder:text-muted-foreground/30 min-h-[22px] transition-[height]",
+                                    "text-foreground/90",
+                                    !isExpanded && isOverflowing ? "max-h-[80px] overflow-hidden" : "h-auto"
+                                )}
+                                rows={1}
+                                autoFocus={isNew}
+                                onBlur={() => {
+                                    if (isNew && !content.trim() && onCancel) onCancel();
+                                }}
+                            />
+                            {/* Mask for collapsed text */}
+                            {!isExpanded && isOverflowing && (
+                                <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-white/80 dark:from-black/50 to-transparent pointer-events-none" />
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Expand/Collapse Chevron */}
+                    {isOverflowing && (
+                        <div className="flex flex-col justify-end pt-8 pl-1">
                             <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-6 w-6 opacity-0 group-hover/note:opacity-100 transition-all text-muted-foreground/40 hover:text-destructive hover:bg-transparent -mr-1"
-                                onClick={onDelete}
+                                onClick={() => setIsExpanded(!isExpanded)}
+                                className="h-6 w-6 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-muted-foreground/50 hover:text-foreground transition-all"
                             >
-                                <Trash2 className="h-3.5 w-3.5" />
+                                <ChevronDown className={cn("h-4 w-4 transition-transform duration-300", isExpanded && "rotate-180")} />
                             </Button>
-                        )}
-                    </div>
+                        </div>
+                    )}
                 </div>
             </div>
         </div >
@@ -1072,6 +1196,11 @@ function ItineraryChecklistEditor({ checklist, onDelete }: { checklist: any, onD
     const [items, setItems] = useState<any[]>(initialItems);
     const [newItemText, setNewItemText] = useState('');
     const [isSaving, setIsSaving] = useState(false);
+    const [isExpanded, setIsExpanded] = useState(false);
+
+    // Derived display items
+    const displayedItems = isExpanded ? items : items.slice(0, 4);
+    const isOverflowing = items.length > 4;
 
     const saveItems = async (newItems: any[]) => {
         // Optimistic update
@@ -1092,6 +1221,7 @@ function ItineraryChecklistEditor({ checklist, onDelete }: { checklist: any, onD
             if (val) {
                 const newItems = [...items, { text: val, checked: false }];
                 setNewItemText('');
+                setIsExpanded(true);
                 await saveItems(newItems);
             }
         }
@@ -1112,13 +1242,6 @@ function ItineraryChecklistEditor({ checklist, onDelete }: { checklist: any, onD
 
     return (
         <div className="relative group/item">
-            {/* Creation Time */}
-            {checklist.createdAt && (
-                <div className="absolute -left-28 top-0 w-16 text-right text-[10px] text-muted-foreground/60 font-medium h-[13px] flex items-center justify-end">
-                    {format(new Date(checklist.createdAt), 'h:mm a')}
-                </div>
-            )}
-
             <div className="absolute -left-10 top-0 h-[13px] w-10 border-b-2 border-l-2 border-gray-200 dark:border-gray-800 rounded-bl-xl" />
 
             <div className="flex items-start gap-3 p-3 rounded-lg border bg-card/40 hover:bg-card/60 transition-colors">
@@ -1129,19 +1252,26 @@ function ItineraryChecklistEditor({ checklist, onDelete }: { checklist: any, onD
                     <div className="flex items-center justify-between mb-2">
                         <div className="text-sm font-medium flex items-center gap-2">
                             {checklist.title}
+                            {checklist.createdAt && (
+                                <span className="text-[10px] text-muted-foreground/60 font-medium font-normal">
+                                    {format(new Date(checklist.createdAt), 'h:mm a')}
+                                </span>
+                            )}
                             {isSaving && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
                         </div>
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6 opacity-0 group-hover/item:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
-                            onClick={onDelete}
-                        >
-                            <Trash2 className="h-3 w-3" />
-                        </Button>
+                        <div className="flex items-center gap-1">
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 opacity-0 group-hover/item:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
+                                onClick={onDelete}
+                            >
+                                <Trash2 className="h-3 w-3" />
+                            </Button>
+                        </div>
                     </div>
                     <div className="space-y-2">
-                        {items.map((checkItem: any, i: number) => (
+                        {displayedItems.map((checkItem: any, i: number) => (
                             <div key={i} className="flex items-center gap-2 text-sm group/checkitem py-0.5">
                                 <div
                                     onClick={() => handleToggle(i)}
@@ -1170,6 +1300,25 @@ function ItineraryChecklistEditor({ checklist, onDelete }: { checklist: any, onD
                                 </Button>
                             </div>
                         ))}
+
+                        {/* Expand/Collapse for Checklists */}
+                        {isOverflowing && (
+                            <div className="flex justify-center pt-1">
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => setIsExpanded(!isExpanded)}
+                                    className="h-6 gap-1 text-xs text-muted-foreground/60 hover:text-foreground hover:bg-muted/50 w-full"
+                                >
+                                    {isExpanded ? (
+                                        <>Show Less <ChevronDown className="h-3 w-3 rotate-180" /></>
+                                    ) : (
+                                        <>Show {items.length - 4} More <ChevronDown className="h-3 w-3" /></>
+                                    )}
+                                </Button>
+                            </div>
+                        )}
+
                         <div className="flex items-center gap-2 pt-1 pl-0.5">
                             <Plus className="h-3.5 w-3.5 text-muted-foreground/50 shrink-0" />
                             <Input

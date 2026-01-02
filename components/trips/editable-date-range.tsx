@@ -197,7 +197,8 @@ export function EditableDateRange({ tripId, startDate, endDate }: EditableDateRa
     return (
         <>
             <Popover open={isOpen} onOpenChange={(open) => {
-                if (!open && !isSaving) {
+                // Only reset if we are NOT saving, NOT checking, and NOT showing confirm dialog
+                if (!open && !isSaving && !isChecking && !showConfirmDialog) {
                     setDateRange(originalDateRange);
                 }
                 setIsOpen(open);
