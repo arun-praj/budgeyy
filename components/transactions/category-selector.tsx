@@ -45,11 +45,39 @@ export function CategorySelector({ type, value, onSelect }: CategorySelectorProp
         const fetchCategories = async () => {
             setLoading(true);
             try {
-                const data = await getCategories(type);
-                setCategories(data as Category[]);
+                if (navigator.onLine) {
+                    const data = await getCategories(type);
+                    setCategories(data as Category[]);
+
+                    // Cache them
+                    const { cacheCategories } = await import('@/lib/local-db');
+                    await cacheCategories(data);
+                } else {
+                    // Offline fallback
+                    const { getCachedCategories } = await import('@/lib/local-db');
+                    const cached = await getCachedCategories(type);
+                    if (cached && cached.length > 0) {
+                        setCategories(cached as Category[]);
+                        // toast.info('Using offline categories'); // Optional: don't spam toasts
+                    } else {
+                        toast.warning('No offline categories found');
+                    }
+                }
             } catch (error) {
                 console.error('Failed to fetch categories', error);
-                toast.error('Failed to load categories');
+
+                // Try cache on error too
+                try {
+                    const { getCachedCategories } = await import('@/lib/local-db');
+                    const cached = await getCachedCategories(type);
+                    if (cached && cached.length > 0) {
+                        setCategories(cached as Category[]);
+                    }
+                } catch (e) { }
+
+                if (!navigator.onLine) {
+                    // Already handled above sort of, but if fetch fails despite being "online"
+                }
             } finally {
                 setLoading(false);
             }

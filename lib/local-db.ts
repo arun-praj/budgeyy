@@ -39,17 +39,27 @@ export interface CachedUserProfile {
     country: string | null;
 }
 
+export interface CachedCategory {
+    id: string;
+    name: string;
+    type: string;
+    icon: string | null;
+    isDefault: boolean | null;
+}
+
 export class LocalDatabase extends Dexie {
     transactions!: Table<LocalTransaction>;
     cachedTransactions!: Table<CachedTransaction>;
     userProfile!: Table<CachedUserProfile>;
+    cachedCategories!: Table<CachedCategory>;
 
     constructor() {
         super('BudgeyyOfflineDB');
-        this.version(2).stores({
+        this.version(3).stores({
             transactions: '++id, synced, createdAt',
             cachedTransactions: 'id, date', // Key by ID
-            userProfile: 'id' // Singleton basically
+            userProfile: 'id', // Singleton basically
+            cachedCategories: 'id, type' // Key by ID, index by type
         }).upgrade(tx => {
             // Migration not strictly needed as new stores are independent
         });
@@ -94,4 +104,16 @@ export async function cacheUserProfile(profile: any) {
 
 export async function getCachedUserProfile() {
     return await db.userProfile.get('profile');
+}
+
+export async function cacheCategories(categories: any[]) {
+    // Upsert categories
+    return await db.cachedCategories.bulkPut(categories);
+}
+
+export async function getCachedCategories(type?: string) {
+    if (type && type !== 'all') {
+        return await db.cachedCategories.where('type').equals(type).toArray();
+    }
+    return await db.cachedCategories.toArray();
 }
