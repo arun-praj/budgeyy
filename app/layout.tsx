@@ -59,7 +59,6 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} font-sans antialiased`}
       >
-        <SpeedInsights />
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
@@ -71,6 +70,8 @@ export default function RootLayout({
           </Suspense>
           <SyncProvider>
             {children}
+            <SpeedInsights />
+
             <ServiceWorkerRegister />
           </SyncProvider>
         </ThemeProvider>
