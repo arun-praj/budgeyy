@@ -140,7 +140,28 @@ export function TripExpenses({ transactions, members, currency = 'USD' }: TripEx
                         <div className="text-2xl font-bold">{formatCurrency(totalTripCost)}</div>
                     </CardContent>
                 </Card>
-                {/* Could add more stats here */}
+
+                {/* Spending Breakdown */}
+                <Card className="md:col-span-2">
+                    <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium text-muted-foreground">Spending Breakdown</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {balances.map(({ member, paid }) => (
+                                <div key={member.id} className="flex items-center gap-3">
+                                    <div className="h-8 w-8 rounded-full border bg-muted overflow-hidden shrink-0">
+                                        <NotionAvatar config={getAvatarConfig(member.image || null)} className="h-full w-full" />
+                                    </div>
+                                    <div className="flex flex-col">
+                                        <span className="text-sm font-medium line-clamp-1">{member.name || member.email}</span>
+                                        <span className="text-xs text-muted-foreground">Paid: {formatCurrency(paid)}</span>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </CardContent>
+                </Card>
             </div>
 
             {/* 2. Balances / "Who owes who" simplified */}
@@ -253,6 +274,6 @@ export function TripExpenses({ transactions, members, currency = 'USD' }: TripEx
                     </Table>
                 </CardContent>
             </Card>
-        </div>
+        </div >
     );
 }

@@ -229,16 +229,24 @@ export function ItineraryTimeline({ items, categories = [], tripId, members = []
                     return { userId: m.id, amount: share };
                 });
             } else if (splitType === 'specific') {
-                if (selectedSplitUsers.length > 0) {
-                    const share = amount / selectedSplitUsers.length;
-                    splits = selectedSplitUsers.map(id => {
-                        return { userId: id, amount: share };
-                    });
+                if (selectedSplitUsers.length === 0) {
+                    toast.error('Please select at least one person to split with');
+                    setIsSubmitting(false);
+                    return;
                 }
+                const share = amount / selectedSplitUsers.length;
+                splits = selectedSplitUsers.map(id => {
+                    return { userId: id, amount: share };
+                });
+            } else if (splitType === 'none') {
+                // "Don't Split" implies Personal Expense. 
+                // The split should be assigned 100% to the payer(s) so Balance = Paid - Share = 0.
+                splits = payers.map(p => ({
+                    userId: p.userId,
+                    guestId: p.guestId,
+                    amount: p.amount
+                }));
             }
-            // If 'none', splits is empty
-
-            // If 'none', splits is empty
 
             if (editingTransactionId) {
                 // UPDATE
@@ -301,46 +309,60 @@ export function ItineraryTimeline({ items, categories = [], tripId, members = []
         setActiveDayId(transaction.tripItineraryId);
         setActiveTripId(transaction.tripId);
 
-        // Set Payers
+        // Set Payers (and capture for later comparison)
+        let currentPayers: { userId?: string, amount: string }[] = [];
         if (transaction.payers && transaction.payers.length > 0) {
             if (transaction.payers.length > 1) {
                 setIsMultiPayer(true);
                 const amounts: Record<string, string> = {};
                 transaction.payers.forEach((p: any) => {
                     const id = p.userId;
-                    if (id) amounts[id] = p.amount;
+                    if (id) {
+                        amounts[id] = p.amount;
+                        currentPayers.push({ userId: id, amount: p.amount });
+                    }
                 });
                 setMultiPayerAmounts(amounts);
             } else {
                 setIsMultiPayer(false);
                 const p = transaction.payers[0];
                 const id = p.userId;
-                if (id) setPayerId(id);
+                if (id) {
+                    setPayerId(id);
+                    currentPayers.push({ userId: id, amount: transaction.amount });
+                }
             }
         } else {
             // Legacy fallback
             setIsMultiPayer(false);
-            if (transaction.paidByUserId) setPayerId(transaction.paidByUserId);
+            if (transaction.paidByUserId) {
+                setPayerId(transaction.paidByUserId);
+                currentPayers.push({ userId: transaction.paidByUserId, amount: transaction.amount });
+            }
         }
 
         // Set Splits
         if (transaction.splits && transaction.splits.length > 0) {
-            // Determine split type based on splits. 
-            // If all equal -> 'equal'. If subset -> 'specific'.
-            // Simplification: default to 'specific' if subset, else 'equal' if amounts match equal share
-            // For now, let's just populate 'specific' with selected users if it was specific.
-            // Or 'equal' with all users.
-
-            // Check if all members are in splits
             const splitUserIds = transaction.splits.map((s: any) => s.userId);
             setSelectedSplitUsers(splitUserIds.filter(Boolean));
 
-            if (splitUserIds.length === members.length) {
-                // Check if amounts roughly equal
-                // If editing complex splits, we might need more logic. 
-                // Assuming 'equal' for full group or 'specific' for subset for this MVP.
+            // Detect Split Type
+            // 1. Check for "None" (Splits almost equal Payers)
+            // We compare if the set of split users and amounts matches payers.
+            // Simplified check: If split count == payer count AND split users == payer users.
+            const payerIds = currentPayers.map(p => p.userId).sort();
+            const sortedSplitIds = splitUserIds.sort();
+
+            const isMatchingPayers = payerIds.length === sortedSplitIds.length &&
+                payerIds.every((val, index) => val === sortedSplitIds[index]);
+
+            if (isMatchingPayers) {
+                setSplitType('none');
+            } else if (splitUserIds.length === members.length) {
+                // If everyone is involved, it's likely 'equal'
                 setSplitType('equal');
             } else {
+                // Subset
                 setSplitType('specific');
             }
         }

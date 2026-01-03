@@ -28,7 +28,7 @@ import { Loader2 } from 'lucide-react';
 
 export default function SettingsPage() {
     return (
-        <div className="container mx-auto p-4 md:p-6 lg:p-8 pt-6 pb-24 md:pb-6 space-y-4">
+        <div className="container mx-auto px-4 pt-6 pb-32 md:p-6 lg:p-8 md:pb-6 space-y-4">
             <div className="flex items-center justify-between space-y-2">
                 <h2 className="text-3xl font-bold tracking-tight">Profile</h2>
             </div>

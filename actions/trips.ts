@@ -1217,8 +1217,27 @@ export async function inviteMember(tripId: string, email: string) {
     // 2. Ensure Shadow User
     await ensureShadowUser(normalizedEmail);
 
+    // 3. Send invitation email
+    const inviteLink = `${process.env.NEXT_PUBLIC_APP_URL}/splitlog/${tripId}`;
+    const unsubscribeUrl = `${process.env.NEXT_PUBLIC_APP_URL}/api/unsubscribe?email=${encodeURIComponent(normalizedEmail)}`;
+    const { subject, html, text } = emailTemplates.tripInvitation(
+        session.user.name || session.user.email,
+        trip.name,
+        inviteLink,
+        unsubscribeUrl
+    );
+
+    await sendEmail({
+        to: normalizedEmail,
+        subject,
+        html,
+        text,
+        unsubscribeLink: unsubscribeUrl,
+    });
+
     revalidatePath(`/splitlog/${tripId}`);
     return { success: true };
+
 }
 
 export async function removeMember(tripId: string, email: string) {
