@@ -82,6 +82,16 @@ function VerifyEmailContent() {
             } else {
                 setIsSuccess(true);
                 toast.success('Email verified successfully!');
+
+                // Force session refresh to flush the 'emailVerified' status to the cookie
+                await authClient.getSession({
+                    fetchOptions: {
+                        headers: {
+                            'Cache-Control': 'no-store'
+                        }
+                    }
+                });
+
                 setTimeout(() => {
                     const callbackUrl = searchParams.get('callbackUrl');
                     const onboardingUrl = `/onboarding${callbackUrl ? `?callbackUrl=${encodeURIComponent(callbackUrl)}` : ''}`;

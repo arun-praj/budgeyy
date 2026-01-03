@@ -20,7 +20,7 @@ import {
     FormMessage,
 } from '@/components/ui/form';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { signUp } from '@/lib/auth-client';
+import { signUp, authClient } from '@/lib/auth-client';
 
 const registerSchema = z.object({
     name: z.string().min(2, 'Name must be at least 2 characters'),
@@ -72,6 +72,12 @@ function RegisterContent() {
             if (result.error) {
                 setError(result.error.message || 'Registration failed');
             } else {
+                // Manually trigger OTP since we disabled auto-require-verification to allow session creation
+                await authClient.emailOtp.sendVerificationOtp({
+                    email: data.email,
+                    type: 'email-verification',
+                });
+
                 const callbackUrl = searchParams.get('callbackUrl');
                 const verifyUrl = `/verify-email?email=${encodeURIComponent(data.email)}${callbackUrl ? `&callbackUrl=${encodeURIComponent(callbackUrl)}` : ''}`;
                 router.push(verifyUrl);
