@@ -1036,3 +1036,83 @@ export async function inviteToTrip(tripId: string, invite: { email: string; gues
     revalidatePath(`/splitlog/${tripId}`);
     return { success: true };
 }
+
+export async function toggleTripPublic(tripId: string, isPublic: boolean) {
+    const session = await auth.api.getSession({
+        headers: await headers()
+    });
+
+    if (!session?.user) {
+        throw new Error('Unauthorized');
+    }
+
+    const trip = await db.query.trips.findFirst({
+        where: eq(trips.id, tripId),
+    });
+
+    if (!trip || trip.userId !== session.user.id) {
+        throw new Error('Unauthorized');
+    }
+
+    const updateData: any = {
+        isPublic,
+        updatedAt: new Date()
+    };
+
+    if (isPublic && !trip.shareId) {
+        updateData.shareId = uuidv4();
+    }
+
+    await db.update(trips)
+        .set(updateData)
+        .where(eq(trips.id, tripId));
+
+    revalidatePath(`/splitlog/${tripId}`);
+    return { success: true, shareId: updateData.shareId || trip.shareId };
+}
+
+export async function getPublicTrip(shareId: string) {
+    const trip = await db.query.trips.findFirst({
+        where: and(
+            eq(trips.shareId, shareId),
+            eq(trips.isPublic, true),
+            eq(trips.isArchived, false)
+        ),
+        with: {
+            user: true,
+            itineraries: {
+                orderBy: (itineraries, { asc }) => [asc(itineraries.dayNumber)],
+                with: {
+                    notes: {
+                        with: {
+                            user: true
+                        }
+                    },
+                    checklists: {
+                        with: {
+                            user: true
+                        }
+                    },
+                    tripTransactions: {
+                        where: (utils, { eq }) => eq(utils.isDeleted, false),
+                        with: {
+                            paidByUser: true,
+                            splits: {
+                                with: {
+                                    user: true
+                                }
+                            },
+                            payers: {
+                                with: {
+                                    user: true
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    return trip;
+}

@@ -14,6 +14,7 @@ import { AvatarConfig } from '@/components/avatars/notion-avatar/types';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { TripNotes } from '@/components/trips/trip-notes';
 import { ItineraryTimeline } from '@/components/trips/itinerary-timeline';
+import { ShareTripDialog } from '@/components/trips/share-trip-dialog';
 import { auth } from '@/lib/auth';
 import { headers } from 'next/headers';
 import { db } from '@/db';
@@ -142,6 +143,8 @@ export default async function TripDetailsPage(props: TripDetailsPageProps) {
         }
     });
 
+    const isCreator = trip.userId === currentUser.id;
+
     return (
         <div className="min-h-screen bg-background pb-20">
             {/* 1. Header Background (10% of screen approx) */}
@@ -156,11 +159,18 @@ export default async function TripDetailsPage(props: TripDetailsPageProps) {
                     href="/splitlog"
                     className="absolute top-4 left-4 z-20 bg-black/50 hover:bg-black/70 text-white rounded-full p-2 transition-colors backdrop-blur-sm"
                 >
-                    <ArrowLeft className="h-5 w-5" />
-                </Link>
+                    <div className="absolute inset-0 bg-black/10" />
 
-                {/* Edit Background Button - Top Right */}
-                <BackgroundSelectorWrapper tripId={params.tripId} currentImage={trip.imageUrl} />
+                    {/* Back Button - Top Left */}
+                    <Link
+                        href="/splitlog"
+                        className="absolute top-4 left-4 z-20 bg-black/50 hover:bg-black/70 text-white rounded-full p-2 transition-colors backdrop-blur-sm"
+                    >
+                        <ArrowLeft className="h-5 w-5" />
+                    </Link>
+
+                    {/* Edit Background Button - Top Right */}
+                    <BackgroundSelectorWrapper tripId={params.tripId} currentImage={trip.imageUrl} />
             </div>
 
             <div className="container max-w-5xl mx-auto px-4 -mt-16 relative z-10">
@@ -224,6 +234,26 @@ export default async function TripDetailsPage(props: TripDetailsPageProps) {
                                     );
                                 })}
                             </TooltipProvider>
+
+                            {/* Share Button (Creator only) */}
+                            {isCreator && (
+                                <TooltipProvider>
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <div className="ml-2">
+                                                <ShareTripDialog
+                                                    tripId={trip.id}
+                                                    isPublic={trip.isPublic}
+                                                    shareId={trip.shareId}
+                                                />
+                                            </div>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                            <p>Share trip publicly</p>
+                                        </TooltipContent>
+                                    </Tooltip>
+                                </TooltipProvider>
+                            )}
 
                             {/* Invite Button */}
                             <TooltipProvider>

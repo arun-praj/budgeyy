@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 // Public routes that don't require authentication
-const publicRoutes = ['/', '/login', '/register', '/api/unsubscribe'];
+const publicRoutes = ['/', '/login', '/register', '/api/unsubscribe', '/share'];
 const authRoutes = ['/login', '/register', '/verify-email'];
 
 export async function middleware(request: NextRequest) {
@@ -14,7 +14,7 @@ export async function middleware(request: NextRequest) {
     }
 
     // Check if route is public
-    const isPublicRoute = publicRoutes.some(route => pathname === route);
+    const isPublicRoute = publicRoutes.some(route => pathname === route || pathname.startsWith('/share/'));
     const isAuthRoute = authRoutes.some(route => pathname === route);
 
     // Get session from server

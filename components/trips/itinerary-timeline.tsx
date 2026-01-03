@@ -57,6 +57,7 @@ interface ItineraryTimelineProps {
     currentUser: { id: string; name?: string | null; email: string; image?: string | null; currency?: string | null };
     startDate: Date | null;
     endDate: Date | null;
+    readOnly?: boolean;
 }
 
 // Helper to parse avatar config
@@ -75,7 +76,7 @@ const getAvatarConfig = (avatarJson: string | null | undefined): AvatarConfig =>
     }
 };
 
-export function ItineraryTimeline({ items, categories = [], tripId, members = [], currentUser, startDate, endDate }: ItineraryTimelineProps) {
+export function ItineraryTimeline({ items, categories = [], tripId, members = [], currentUser, startDate, endDate, readOnly = false }: ItineraryTimelineProps) {
     // ... (state lines 59-136 omitted for brevity, keeping same)
     // Add Item State
     const [activeDayId, setActiveDayId] = useState<string | null>(null);
@@ -540,31 +541,33 @@ export function ItineraryTimeline({ items, categories = [], tripId, members = []
                                     </div>
 
                                     {/* Menu - Absolute Top Right */}
-                                    <div className="absolute top-0 right-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <DropdownMenu>
-                                            <DropdownMenuTrigger asChild>
-                                                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:bg-muted">
-                                                    <MoreHorizontal className="h-4 w-4" />
-                                                </Button>
-                                            </DropdownMenuTrigger>
-                                            <DropdownMenuContent align="end">
-                                                <DropdownMenuItem
-                                                    className="text-destructive focus:text-destructive cursor-pointer"
-                                                    onClick={async () => {
-                                                        try {
-                                                            await deleteItineraryDay(item.id);
-                                                            toast.success('Day deleted');
-                                                        } catch (error) {
-                                                            toast.error('Failed to delete day');
-                                                        }
-                                                    }}
-                                                >
-                                                    <Trash2 className="h-4 w-4 mr-2" />
-                                                    Delete Day
-                                                </DropdownMenuItem>
-                                            </DropdownMenuContent>
-                                        </DropdownMenu>
-                                    </div>
+                                    {!readOnly && (
+                                        <div className="absolute top-0 right-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:bg-muted">
+                                                        <MoreHorizontal className="h-4 w-4" />
+                                                    </Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent align="end">
+                                                    <DropdownMenuItem
+                                                        className="text-destructive focus:text-destructive cursor-pointer"
+                                                        onClick={async () => {
+                                                            try {
+                                                                await deleteItineraryDay(item.id);
+                                                                toast.success('Day deleted');
+                                                            } catch (error) {
+                                                                toast.error('Failed to delete day');
+                                                            }
+                                                        }}
+                                                    >
+                                                        <Trash2 className="h-4 w-4 mr-2" />
+                                                        Delete Day
+                                                    </DropdownMenuItem>
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* Combined Droppable Zone */}

@@ -109,6 +109,8 @@ export const trips = pgTable('trips', {
     endDate: timestamp('end_date'),
     isArchived: boolean('is_archived').default(false).notNull(),
     archivedAt: timestamp('archived_at'),
+    isPublic: boolean('is_public').default(false).notNull(),
+    shareId: text('share_id').unique(),
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
