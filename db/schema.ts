@@ -107,6 +107,8 @@ export const trips = pgTable('trips', {
     notes: text('notes'),
     startDate: timestamp('start_date'),
     endDate: timestamp('end_date'),
+    isArchived: boolean('is_archived').default(false).notNull(),
+    archivedAt: timestamp('archived_at'),
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });

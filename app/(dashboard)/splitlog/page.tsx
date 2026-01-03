@@ -7,6 +7,9 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { format } from 'date-fns';
 import Image from 'next/image';
 import Link from 'next/link';
+import { TripActionsDropdown } from '@/components/trips/trip-actions-dropdown';
+import { auth } from '@/lib/auth';
+import { headers } from 'next/headers';
 
 export default function SplitlogPage() {
     return (
@@ -19,6 +22,9 @@ export default function SplitlogPage() {
 }
 
 async function TripsContent() {
+    const session = await auth.api.getSession({
+        headers: await headers()
+    });
     const trips = await getTrips();
     const hasTrips = trips.length > 0;
 
@@ -68,6 +74,11 @@ async function TripsContent() {
                                     </div>
                                 )}
                                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                                <div className="absolute top-4 right-4 z-20">
+                                    {trip.userId === session?.user?.id && (
+                                        <TripActionsDropdown tripId={trip.id} tripName={trip.name} />
+                                    )}
+                                </div>
                                 <div className="absolute bottom-4 left-4 text-white">
                                     <h3 className="font-bold text-lg">{trip.name}</h3>
                                     {trip.destination && (

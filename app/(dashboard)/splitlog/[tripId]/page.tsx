@@ -14,7 +14,6 @@ import { AvatarConfig } from '@/components/avatars/notion-avatar/types';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { TripNotes } from '@/components/trips/trip-notes';
 import { ItineraryTimeline } from '@/components/trips/itinerary-timeline';
-import { DeleteTripDialog } from '@/components/trips/delete-trip-dialog';
 import { auth } from '@/lib/auth';
 import { headers } from 'next/headers';
 import { db } from '@/db';
@@ -265,19 +264,6 @@ export default async function TripDetailsPage(props: TripDetailsPageProps) {
                                     <div className="pt-4 border-t">
                                         <TripNotes tripId={trip.id} initialNotes={trip.notes} />
                                     </div>
-
-                                    {trip.userId === currentUser.id && (
-                                        <div className="pt-6 border-t">
-                                            <h3 className="font-medium text-destructive mb-3">Danger Zone</h3>
-                                            <div className="p-4 border border-destructive/20 bg-destructive/5 rounded-lg flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                                                <div>
-                                                    <p className="text-sm font-medium">Delete this trip</p>
-                                                    <p className="text-xs text-muted-foreground">Once deleted, it cannot be recovered. All expenses and notes will be lost.</p>
-                                                </div>
-                                                <DeleteTripDialog tripId={trip.id} tripName={trip.name} />
-                                            </div>
-                                        </div>
-                                    )}
                                 </CardContent>
                             </Card>
                         </TabsContent>

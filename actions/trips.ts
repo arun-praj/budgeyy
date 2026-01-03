@@ -53,8 +53,11 @@ export async function getTrips() {
     }
 
     const userTrips = await db.query.trips.findMany({
-        where: eq(trips.userId, session.user.id),
-        orderBy: [desc(trips.startDate)],
+        where: and(
+            eq(trips.userId, session.user.id),
+            eq(trips.isArchived, false)
+        ),
+        orderBy: [desc(trips.createdAt)],
     });
 
     return userTrips;
@@ -387,6 +390,40 @@ export async function deleteTrip(tripId: string) {
     });
 
     revalidatePath('/splitlog');
+    return { success: true };
+}
+
+export async function archiveTrip(tripId: string) {
+    const session = await auth.api.getSession({
+        headers: await headers()
+    });
+
+    if (!session?.user) {
+        throw new Error('Unauthorized');
+    }
+
+    const trip = await db.query.trips.findFirst({
+        where: eq(trips.id, tripId),
+    });
+
+    if (!trip) {
+        throw new Error('Trip not found');
+    }
+
+    if (trip.userId !== session.user.id) {
+        throw new Error('Only the trip creator can archive the trip');
+    }
+
+    await db.update(trips)
+        .set({
+            isArchived: true,
+            archivedAt: new Date(),
+            updatedAt: new Date()
+        })
+        .where(eq(trips.id, tripId));
+
+    revalidatePath('/splitlog');
+    revalidatePath(`/splitlog/${tripId}`);
     return { success: true };
 }
 
