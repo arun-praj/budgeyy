@@ -13,7 +13,13 @@ interface DashboardFiltersProps {
 
 export function DashboardFilters({ calendar = 'gregorian' }: DashboardFiltersProps) {
     const router = useRouter();
+    const [mounted, setMounted] = useState(false);
     const searchParams = useSearchParams();
+
+    useEffect(() => {
+        setMounted(true);
+    }, []);
+
     const months = getLast12Months(calendar);
 
     // Check for "date" param
@@ -24,7 +30,7 @@ export function DashboardFilters({ calendar = 'gregorian' }: DashboardFiltersPro
     // We can use the ISO string of the start date as the value.
     const getValue = (d: Date) => d.toISOString();
 
-    const currentValue = dateParam
+    const currentValue = mounted && dateParam
         ? dateParam // Assume param is ISO string
         : getValue(months[0]);
 

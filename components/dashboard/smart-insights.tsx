@@ -3,6 +3,7 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { formatCurrency } from '@/lib/utils';
 import { TrendingUp, TrendingDown, Calendar, AlertCircle, Sparkles } from 'lucide-react';
+import { useEffect, useState } from 'react';
 
 interface SmartInsightsProps {
     totalSpent: number;
@@ -25,6 +26,12 @@ export function SmartInsights({
     income = 0,
     savingsAmount = 0
 }: SmartInsightsProps) {
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => {
+        setMounted(true);
+    }, []);
+
     if (daysPassed === 0) return null;
 
     // 1. Projection
@@ -132,7 +139,7 @@ export function SmartInsights({
                     <div>
                         <p className="text-sm font-medium">Spending Habits</p>
                         <ul className="text-xs text-muted-foreground mt-1 list-disc pl-3 space-y-1">
-                            <li>Highest spend: <span className="font-semibold text-foreground">{formatCurrency(maxExpenseDay.expense, currency)}</span> on {new Date(maxExpenseDay.date).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric' })}.</li>
+                            <li>Highest spend: <span className="font-semibold text-foreground">{formatCurrency(maxExpenseDay.expense, currency)}</span> on {mounted ? new Date(maxExpenseDay.date).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric' }) : '...'}.</li>
                             {spendMoreOnWeekend && <li>You tend to spend <span className="font-semibold text-foreground">{((avgWeekend / avgWeekday - 1) * 100).toFixed(0)}% more</span> on weekends.</li>}
                             {zeroSpendDaysEstimated > 0 && <li>You've had <span className="font-semibold text-foreground">{zeroSpendDaysEstimated} zero-spend days</span> this month! 🎉</li>}
                         </ul>

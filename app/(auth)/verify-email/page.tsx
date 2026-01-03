@@ -45,7 +45,12 @@ function VerifyEmailContent() {
     const [isResending, setIsResending] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [isSuccess, setIsSuccess] = useState(false);
+    const [mounted, setMounted] = useState(false);
     const hasSentInitial = useRef(false);
+
+    useEffect(() => {
+        setMounted(true);
+    }, []);
 
     const form = useForm<VerifyFormValues>({
         resolver: zodResolver(verifySchema),
@@ -150,10 +155,10 @@ function VerifyEmailContent() {
                             <Mail className="h-8 w-8 text-primary" />
                         </motion.div>
                         <CardTitle className="text-3xl font-bold tracking-tight">Check your email</CardTitle>
-                        <CardDescription className="text-base">
+                        <CardDescription className="text-base text-center">
                             We&apos;ve sent a 6-digit verification code to
                             <br />
-                            <span className="font-semibold text-primary/80">{email || 'your email'}</span>
+                            <span className="font-semibold text-primary/80">{mounted ? (email || 'your email') : 'your email'}</span>
                         </CardDescription>
                     </CardHeader>
                     <CardContent>

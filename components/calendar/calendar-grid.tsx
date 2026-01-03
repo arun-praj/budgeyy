@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { cn, formatCurrency } from '@/lib/utils';
 import { getMonthRange, formatDate } from '@/lib/date-utils';
 import NepaliDate from 'nepali-date-converter';
@@ -24,6 +24,11 @@ interface CalendarGridProps {
 
 export function CalendarGrid({ date, data, currency = 'USD', calendar = 'gregorian' }: CalendarGridProps) {
     const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => {
+        setMounted(true);
+    }, []);
 
     const calendarDays = useMemo(() => {
         const { start, end } = getMonthRange(date, calendar as any);
@@ -76,6 +81,7 @@ export function CalendarGrid({ date, data, currency = 'USD', calendar = 'gregori
     };
 
     const isToday = (d: Date) => {
+        if (!mounted) return false;
         const today = new Date();
         return d.getDate() === today.getDate() &&
             d.getMonth() === today.getMonth() &&
