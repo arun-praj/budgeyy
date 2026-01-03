@@ -70,11 +70,6 @@ export function ShareTripDialog({ tripId, isPublic: initialIsPublic, shareId: in
             variant="outline"
             size={showText ? "sm" : "icon"}
             className={cn("gap-2", !showText && "h-auto w-auto p-2 rounded-full bg-black/50 hover:bg-black/70 text-white border-0 backdrop-blur-sm")}
-            onClick={(e) => {
-                // Prevent bubbling to parent Link components
-                e.preventDefault();
-                e.stopPropagation();
-            }}
         >
             <Share2 className={cn("h-4 w-4", !showText && "h-5 w-5 text-white")} />
             {showText && "Share"}
@@ -83,24 +78,26 @@ export function ShareTripDialog({ tripId, isPublic: initialIsPublic, shareId: in
 
     return (
         <Dialog>
-            {showText ? (
-                <DialogTrigger asChild>
-                    {triggerButton}
-                </DialogTrigger>
-            ) : (
-                <TooltipProvider>
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                            <DialogTrigger asChild>
-                                {triggerButton}
-                            </DialogTrigger>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                            <p>Share trip</p>
-                        </TooltipContent>
-                    </Tooltip>
-                </TooltipProvider>
-            )}
+            <div onClick={(e) => e.stopPropagation()} className="flex items-center">
+                {showText ? (
+                    <DialogTrigger asChild>
+                        {triggerButton}
+                    </DialogTrigger>
+                ) : (
+                    <TooltipProvider>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <DialogTrigger asChild>
+                                    {triggerButton}
+                                </DialogTrigger>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                <p>Share trip</p>
+                            </TooltipContent>
+                        </Tooltip>
+                    </TooltipProvider>
+                )}
+            </div>
             <DialogContent className="sm:max-w-md" onClick={(e) => e.stopPropagation()}>
                 <DialogHeader>
                     <DialogTitle>Share Trip</DialogTitle>
