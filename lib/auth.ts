@@ -2,6 +2,8 @@ import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { db } from '@/db';
 import * as schema from '@/db/schema';
+import { emailOTP } from 'better-auth/plugins';
+import { sendEmail, emailTemplates } from './mail';
 
 export const auth = betterAuth({
     database: drizzleAdapter(db, {
@@ -16,8 +18,23 @@ export const auth = betterAuth({
     }),
     emailAndPassword: {
         enabled: true,
-        requireEmailVerification: false,
+        requireEmailVerification: true,
     },
+    plugins: [
+        emailOTP({
+            async sendVerificationOTP({ email, otp }) {
+                const unsubscribeUrl = `${process.env.NEXT_PUBLIC_APP_URL}/api/unsubscribe?email=${encodeURIComponent(email)}`;
+                const { subject, html, text } = emailTemplates.otp(otp, unsubscribeUrl);
+                await sendEmail({
+                    to: email,
+                    subject,
+                    html,
+                    text,
+                    unsubscribeLink: unsubscribeUrl,
+                });
+            },
+        }),
+    ],
     session: {
         expiresIn: 60 * 60 * 24 * 7, // 7 days
         updateAge: 60 * 60 * 24, // Update session every 24 hours

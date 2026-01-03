@@ -8,6 +8,7 @@ import { auth } from '@/lib/auth';
 import { headers } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 import { v4 as uuidv4 } from 'uuid';
+import { sendEmail, emailTemplates } from '@/lib/mail';
 
 /**
  * Ensures a user exists for the given email.
@@ -105,6 +106,24 @@ export async function createTrip(data: {
         // 2. Ensure Shadow Users for all invitees
         for (const invite of invitesToProcess) {
             await ensureShadowUser(invite.email, undefined, invite.guestAvatar);
+
+            // 3. Send invitation email
+            const inviteLink = `${process.env.NEXT_PUBLIC_APP_URL}/splitlog/${newTrip.id}`;
+            const unsubscribeUrl = `${process.env.NEXT_PUBLIC_APP_URL}/api/unsubscribe?email=${encodeURIComponent(invite.email)}`;
+            const { subject, html, text } = emailTemplates.tripInvitation(
+                session.user.name || session.user.email,
+                data.name,
+                inviteLink,
+                unsubscribeUrl
+            );
+
+            await sendEmail({
+                to: invite.email,
+                subject,
+                html,
+                text,
+                unsubscribeLink: unsubscribeUrl,
+            }).catch(err => console.error(`Failed to send invite email to ${invite.email}:`, err));
         }
     }
 
@@ -866,4 +885,54 @@ export async function checkItineraryConflicts(tripId: string, newStartDate: Date
             hasTitle: !!(it.title && it.title.trim() !== ''),
         })),
     };
+}
+
+export async function inviteToTrip(tripId: string, invite: { email: string; guestAvatar?: string }) {
+    const session = await auth.api.getSession({
+        headers: await headers()
+    });
+
+    if (!session?.user) {
+        throw new Error('Unauthorized');
+    }
+
+    const trip = await db.query.trips.findFirst({
+        where: eq(schema.trips.id, tripId),
+    });
+
+    if (!trip || trip.userId !== session.user.id) {
+        throw new Error('Unauthorized or trip not found');
+    }
+
+    // 1. Create Invite Record
+    await db.insert(schema.tripInvites).values({
+        tripId,
+        email: invite.email,
+        status: 'pending',
+        guestAvatar: invite.guestAvatar,
+    });
+
+    // 2. Ensure Shadow User
+    await ensureShadowUser(invite.email, undefined, invite.guestAvatar);
+
+    // 3. Send invitation email
+    const inviteLink = `${process.env.NEXT_PUBLIC_APP_URL}/splitlog/${tripId}`;
+    const unsubscribeUrl = `${process.env.NEXT_PUBLIC_APP_URL}/api/unsubscribe?email=${encodeURIComponent(invite.email)}`;
+    const { subject, html, text } = emailTemplates.tripInvitation(
+        session.user.name || session.user.email,
+        trip.name,
+        inviteLink,
+        unsubscribeUrl
+    );
+
+    await sendEmail({
+        to: invite.email,
+        subject,
+        html,
+        text,
+        unsubscribeLink: unsubscribeUrl,
+    });
+
+    revalidatePath(`/splitlog/${tripId}`);
+    return { success: true };
 }

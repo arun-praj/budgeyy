@@ -28,6 +28,7 @@ export const users = pgTable('users', {
     avatar: text('avatar'), // Storing JSON string of avatar config
     onboardingCompleted: boolean('onboarding_completed').default(false),
     isGuest: boolean('is_guest').default(false),
+    emailNotificationsEnabled: boolean('email_notifications_enabled').default(true).notNull(),
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
@@ -252,6 +253,7 @@ export const tripInvites = pgTable('trip_invites', {
     email: text('email').notNull(),
     status: text('status', { enum: ['pending', 'accepted', 'rejected'] }).default('pending'),
     guestAvatar: text('guest_avatar'), // JSON string for guest avatar config
+    emailNotificationsEnabled: boolean('email_notifications_enabled').default(true).notNull(),
     createdAt: timestamp('created_at').notNull().defaultNow(),
 });
 
