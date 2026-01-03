@@ -1,7 +1,7 @@
 'use server';
 
 import { db } from '@/db';
-import { trips, tripTransactions } from '@/db/schema';
+import { trips, tripTransactions, tripInvites } from '@/db/schema';
 import * as schema from '@/db/schema';
 import { eq, desc, and, inArray, gt, sql, lte } from 'drizzle-orm';
 import { auth } from '@/lib/auth';
@@ -1115,4 +1115,88 @@ export async function getPublicTrip(shareId: string) {
     });
 
     return trip;
+}
+
+export async function inviteMember(tripId: string, email: string) {
+    const session = await auth.api.getSession({
+        headers: await headers()
+    });
+
+    if (!session?.user?.id) {
+        throw new Error('Unauthorized');
+    }
+
+    // Verify trip ownership
+    const trip = await db.query.trips.findFirst({
+        where: eq(trips.id, tripId),
+    });
+
+    if (!trip) {
+        throw new Error('Trip not found');
+    }
+
+    if (trip.userId !== session.user.id) {
+        throw new Error('Only the trip owner can invite members');
+    }
+
+    const normalizedEmail = email.toLowerCase();
+
+    // Check if already invited
+    const existingInvite = await db.query.tripInvites.findFirst({
+        where: sql`${tripInvites.tripId} = ${tripId} AND ${tripInvites.email} = ${normalizedEmail}`
+    });
+
+    if (existingInvite) {
+        throw new Error('User already invited');
+    }
+
+    // 1. Create Invite Record
+    await db.insert(tripInvites).values({
+        tripId,
+        email: normalizedEmail,
+        status: 'pending',
+    });
+
+    // 2. Ensure Shadow User
+    await ensureShadowUser(normalizedEmail);
+
+    revalidatePath(`/splitlog/${tripId}`);
+    return { success: true };
+}
+
+export async function removeMember(tripId: string, email: string) {
+    const session = await auth.api.getSession({
+        headers: await headers()
+    });
+
+    if (!session?.user?.id) {
+        throw new Error('Unauthorized');
+    }
+
+    // Verify trip ownership
+    const trip = await db.query.trips.findFirst({
+        where: eq(trips.id, tripId),
+    });
+
+    if (!trip) {
+        throw new Error('Trip not found');
+    }
+
+    if (trip.userId !== session.user.id) {
+        throw new Error('Only the trip owner can remove members');
+    }
+
+    const normalizedEmail = email.toLowerCase();
+
+    // Delete invite
+    await db.delete(tripInvites)
+        .where(
+            and(
+                eq(tripInvites.tripId, tripId),
+                eq(tripInvites.email, normalizedEmail)
+            )
+        );
+
+    revalidatePath(`/splitlog/${tripId}`);
+    return { success: true };
 }

@@ -15,6 +15,8 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { TripNotes } from '@/components/trips/trip-notes';
 import { ItineraryTimeline } from '@/components/trips/itinerary-timeline';
 import { ShareTripDialog } from '@/components/trips/share-trip-dialog';
+import { InviteMemberDialog } from '@/components/trips/invite-member-dialog';
+import { MemberAvatarAction } from '@/components/trips/member-avatar-action';
 import { auth } from '@/lib/auth';
 import { headers } from 'next/headers';
 import { db } from '@/db';
@@ -224,18 +226,16 @@ export default async function TripDetailsPage(props: TripDetailsPageProps) {
                                     const isJoined = invite.status === 'accepted';
 
                                     return (
-                                        <Tooltip key={invite.email}>
-                                            <TooltipTrigger>
-                                                <div className="relative h-10 w-10 group">
-                                                    <div className={`h-full w-full rounded-full border-2 ${isJoined ? 'border-green-500' : 'border-orange-400'} bg-muted overflow-hidden`}>
-                                                        <NotionAvatar config={avatarConfig} className="h-full w-full" />
-                                                    </div>
-                                                </div>
-                                            </TooltipTrigger>
-                                            <TooltipContent>
-                                                <p>{displayName} ({invite.status})</p>
-                                            </TooltipContent>
-                                        </Tooltip>
+                                        <MemberAvatarAction
+                                            key={invite.email}
+                                            tripId={trip.id}
+                                            email={invite.email}
+                                            avatarConfig={avatarConfig}
+                                            displayName={displayName}
+                                            status={invite.status as 'pending' | 'accepted' | 'rejected'}
+                                            isCreator={isCreator}
+                                            isJoined={isJoined}
+                                        />
                                     );
                                 })}
                             </TooltipProvider>
@@ -245,9 +245,9 @@ export default async function TripDetailsPage(props: TripDetailsPageProps) {
                             <TooltipProvider>
                                 <Tooltip>
                                     <TooltipTrigger asChild>
-                                        <Button size="icon" variant="outline" className="rounded-full ml-2 h-10 w-10 border-dashed">
-                                            <Plus className="h-4 w-4" />
-                                        </Button>
+                                        <div>
+                                            <InviteMemberDialog tripId={trip.id} />
+                                        </div>
                                     </TooltipTrigger>
                                     <TooltipContent>
                                         <p>Invite friends</p>
