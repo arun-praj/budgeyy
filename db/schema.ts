@@ -7,6 +7,7 @@ export const pricingTierEnum = pgEnum('pricing_tier', ['free', 'pro', 'enterpris
 export const transactionTypeEnum = pgEnum('transaction_type', ['income', 'expense', 'savings']);
 export const necessityLevelEnum = pgEnum('necessity_level', ['needs', 'wants', 'savings']);
 export const budgetPeriodEnum = pgEnum('budget_period', ['monthly', 'yearly']);
+export const accountStatusEnum = pgEnum('account_status', ['active', 'deactivated', 'scheduled_for_deletion']);
 
 export const themeEnum = pgEnum('theme', ['light', 'dark', 'system']);
 
@@ -29,6 +30,11 @@ export const users = pgTable('users', {
     onboardingCompleted: boolean('onboarding_completed').default(false),
     isGuest: boolean('is_guest').default(false),
     emailNotificationsEnabled: boolean('email_notifications_enabled').default(true).notNull(),
+
+    // Account Status
+    accountStatus: accountStatusEnum('account_status').default('active').notNull(),
+    scheduledDeletionAt: timestamp('scheduled_deletion_at'),
+
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });

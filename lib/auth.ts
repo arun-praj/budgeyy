@@ -68,6 +68,15 @@ export const auth = betterAuth({
                 required: false,
                 defaultValue: false,
             },
+            accountStatus: {
+                type: 'string',
+                required: false,
+                defaultValue: 'active',
+            },
+            scheduledDeletionAt: {
+                type: 'date',
+                required: false,
+            },
         },
     },
     trustedOrigins: [

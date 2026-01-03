@@ -1,6 +1,9 @@
 import { DeletedTransactionsList } from '@/components/settings/deleted-transactions-list';
 import { SettingsForm } from '@/components/settings/settings-form';
 import { AccountForm } from '@/components/settings/account-form';
+import { DataExport } from '@/components/settings/data-export';
+import { DataImport } from '@/components/settings/data-import';
+import { AccountActions } from '@/components/settings/account-actions';
 import { getUserSettings } from '@/actions/user';
 import { getDeletedTransactions } from '@/actions/transactions';
 import { redirect } from 'next/navigation';
@@ -62,22 +65,12 @@ async function SettingsContent() {
     }
 
     return (
-        <Tabs defaultValue="account" className="space-y-4">
+        <Tabs defaultValue="general" className="space-y-4">
             <TabsList className="grid w-full grid-cols-3 lg:w-[400px]">
-                <TabsTrigger value="account">Account</TabsTrigger>
                 <TabsTrigger value="general">General</TabsTrigger>
+                <TabsTrigger value="account">Account</TabsTrigger>
                 <TabsTrigger value="deleted">Trash</TabsTrigger>
             </TabsList>
-
-            <TabsContent value="account" className="space-y-4">
-                <AccountForm
-                    defaultValues={{
-                        fullName: user.fullName || '',
-                        email: user.email || '',
-                        avatar: user.avatar || undefined,
-                    }}
-                />
-            </TabsContent>
 
             <TabsContent value="general" className="space-y-4">
                 <SettingsForm
@@ -87,6 +80,19 @@ async function SettingsContent() {
                         theme: user.theme as 'light' | 'dark' | 'system' || 'system',
                     }}
                 />
+            </TabsContent>
+
+            <TabsContent value="account" className="space-y-4">
+                <AccountForm
+                    defaultValues={{
+                        fullName: user.fullName || '',
+                        email: user.email || '',
+                        avatar: user.avatar || undefined,
+                    }}
+                />
+                <DataExport />
+                <DataImport />
+                <AccountActions />
             </TabsContent>
 
             <TabsContent value="deleted" className="space-y-4">

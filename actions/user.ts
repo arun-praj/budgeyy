@@ -136,6 +136,8 @@ export async function getUserSettings() {
             country: true,
             createdAt: true,
             updatedAt: true,
+            accountStatus: true,
+            scheduledDeletionAt: true,
         }
     });
 
@@ -184,4 +186,85 @@ export async function checkUserForInvite(email: string) {
     }
 
     return { exists: false, avatar: null, name: null };
+}
+
+export async function deleteAccount() {
+    const session = await auth.api.getSession({
+        headers: await headers(),
+    });
+
+    if (!session?.user?.id) {
+        return { error: 'Unauthorized' };
+    }
+
+    try {
+        const scheduledDate = new Date();
+        scheduledDate.setDate(scheduledDate.getDate() + 30); // 30 days from now
+
+        await db
+            .update(users)
+            .set({
+                accountStatus: 'scheduled_for_deletion',
+                scheduledDeletionAt: scheduledDate,
+                updatedAt: new Date(),
+            })
+            .where(eq(users.id, session.user.id));
+
+        return { success: true };
+    } catch (error) {
+        console.error('Failed to schedule account deletion:', error);
+        return { error: 'Failed to delete account' };
+    }
+}
+
+export async function deactivateAccount() {
+    const session = await auth.api.getSession({
+        headers: await headers(),
+    });
+
+    if (!session?.user?.id) {
+        return { error: 'Unauthorized' };
+    }
+
+    try {
+        await db
+            .update(users)
+            .set({
+                accountStatus: 'deactivated',
+                updatedAt: new Date(),
+            })
+            .where(eq(users.id, session.user.id));
+
+        return { success: true };
+    } catch (error) {
+        console.error('Failed to deactivate account:', error);
+        return { error: 'Failed to deactivate account' };
+    }
+}
+
+export async function reactivateAccount() {
+    const session = await auth.api.getSession({
+        headers: await headers(),
+    });
+
+    if (!session?.user?.id) {
+        return { error: 'Unauthorized' };
+    }
+
+    try {
+        await db
+            .update(users)
+            .set({
+                accountStatus: 'active',
+                scheduledDeletionAt: null,
+                updatedAt: new Date(),
+            })
+            .where(eq(users.id, session.user.id));
+
+        revalidatePath('/');
+        return { success: true };
+    } catch (error) {
+        console.error('Failed to reactivate account:', error);
+        return { error: 'Failed to reactivate account' };
+    }
 }

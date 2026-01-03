@@ -26,6 +26,9 @@ export default function DashboardLayout({
             <Suspense fallback={null}>
                 <ConnectedBottomNav />
             </Suspense>
+            <Suspense fallback={null}>
+                <ConnectedAccountStatus />
+            </Suspense>
             <Toaster />
         </div>
     );
@@ -39,4 +42,18 @@ async function ConnectedSidebar() {
 async function ConnectedBottomNav() {
     const userSettings = await getUserSettings();
     return <BottomNav avatarConfig={userSettings?.avatar} calendar={userSettings?.calendarPreference} />;
+}
+
+import { AccountStatusChecker } from '@/components/layout/account-status-checker';
+
+async function ConnectedAccountStatus() {
+    const userSettings = await getUserSettings();
+    if (!userSettings) return null;
+
+    return (
+        <AccountStatusChecker
+            status={userSettings.accountStatus as any}
+            scheduledDate={userSettings.scheduledDeletionAt}
+        />
+    );
 }
