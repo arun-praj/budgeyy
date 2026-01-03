@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation';
-import { getTrip } from '@/actions/trips';
+import { getTrip, acceptTripInvite } from '@/actions/trips';
 import { MapPin, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { BackgroundSelectorWrapper } from '@/components/trips/background-selector-wrapper';
@@ -151,6 +151,15 @@ export default async function TripDetailsPage(props: TripDetailsPageProps) {
     });
 
     const isCreator = trip.userId === currentUser.id;
+
+    // Auto-accept invite if pending
+    if (!isCreator) {
+        const userInvite = trip.invites.find(i => i.email.toLowerCase() === currentUser.email.toLowerCase());
+        if (userInvite && userInvite.status === 'pending') {
+            // We can call server action purely for side effect
+            await acceptTripInvite(trip.id);
+        }
+    }
 
     return (
         <div className="min-h-screen bg-background pb-20">

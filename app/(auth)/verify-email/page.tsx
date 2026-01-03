@@ -83,7 +83,9 @@ function VerifyEmailContent() {
                 setIsSuccess(true);
                 toast.success('Email verified successfully!');
                 setTimeout(() => {
-                    router.push('/onboarding');
+                    const callbackUrl = searchParams.get('callbackUrl');
+                    const onboardingUrl = `/onboarding${callbackUrl ? `?callbackUrl=${encodeURIComponent(callbackUrl)}` : ''}`;
+                    router.push(onboardingUrl);
                     router.refresh();
                 }, 2000);
             }

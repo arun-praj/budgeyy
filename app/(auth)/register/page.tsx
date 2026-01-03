@@ -2,7 +2,7 @@
 
 import { useState, Suspense } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -44,6 +44,7 @@ export default function RegisterPage() {
 
 function RegisterContent() {
     const router = useRouter();
+    const searchParams = useSearchParams();
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -71,7 +72,9 @@ function RegisterContent() {
             if (result.error) {
                 setError(result.error.message || 'Registration failed');
             } else {
-                router.push(`/verify-email?email=${encodeURIComponent(data.email)}`);
+                const callbackUrl = searchParams.get('callbackUrl');
+                const verifyUrl = `/verify-email?email=${encodeURIComponent(data.email)}${callbackUrl ? `&callbackUrl=${encodeURIComponent(callbackUrl)}` : ''}`;
+                router.push(verifyUrl);
                 router.refresh();
             }
         } catch {

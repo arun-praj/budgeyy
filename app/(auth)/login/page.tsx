@@ -2,7 +2,7 @@
 
 import { useState, Suspense } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -39,6 +39,7 @@ export default function LoginPage() {
 
 function LoginContent() {
     const router = useRouter();
+    const searchParams = useSearchParams();
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -72,7 +73,8 @@ function LoginContent() {
                     setError(result.error.message || 'Invalid credentials');
                 }
             } else {
-                router.push('/dashboard');
+                const callbackUrl = searchParams.get('callbackUrl');
+                router.push(callbackUrl || '/dashboard');
                 router.refresh();
             }
         } catch {

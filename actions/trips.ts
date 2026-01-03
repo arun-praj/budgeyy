@@ -3,7 +3,7 @@
 import { db } from '@/db';
 import { trips, tripTransactions, tripInvites } from '@/db/schema';
 import * as schema from '@/db/schema';
-import { eq, desc, and, inArray, gt, sql, lte } from 'drizzle-orm';
+import { eq, desc, and, inArray, gt, sql, lte, or } from 'drizzle-orm';
 import { auth } from '@/lib/auth';
 import { headers } from 'next/headers';
 import { revalidatePath } from 'next/cache';
@@ -54,8 +54,19 @@ export async function getTrips() {
 
     const userTrips = await db.query.trips.findMany({
         where: and(
-            eq(trips.userId, session.user.id),
-            eq(trips.isArchived, false)
+            eq(trips.isArchived, false),
+            or(
+                eq(trips.userId, session.user.id),
+                // Check if user ID exists in the invited list (requires a join or subquery normally, 
+                // but with Drizzle queries we can use 'exists' or just multiple queries if simpler.
+                // Actually, let's use the 'invites' relation if possible, or manual filter.
+                // A raw SQL exists query is most efficient here.
+                sql`EXISTS (
+                    SELECT 1 FROM trip_invites 
+                    WHERE trip_invites.trip_id = ${trips.id} 
+                    AND trip_invites.email = ${session.user.email}
+                )`
+            )
         ),
         orderBy: [desc(trips.createdAt)],
     });
@@ -163,6 +174,32 @@ export async function createTrip(data: {
 
     revalidatePath('/splitlog');
     return newTrip.id;
+}
+
+export async function acceptTripInvite(tripId: string) {
+    const session = await auth.api.getSession({
+        headers: await headers()
+    });
+
+    if (!session?.user?.email) return;
+
+    // Find pending invite
+    const invite = await db.query.tripInvites.findFirst({
+        where: and(
+            eq(tripInvites.tripId, tripId),
+            eq(tripInvites.email, session.user.email),
+            eq(tripInvites.status, 'pending')
+        )
+    });
+
+    if (invite) {
+        await db.update(tripInvites)
+            .set({ status: 'accepted' })
+            .where(eq(tripInvites.id, invite.id));
+
+        revalidatePath(`/splitlog/${tripId}`);
+        revalidatePath('/splitlog');
+    }
 }
 
 export async function updateTripNotes(tripId: string, notes: string) {

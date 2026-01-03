@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -66,6 +66,7 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { completeOnboarding, submitOnboardingSurvey } from '@/actions/user';
+import { authClient } from '@/lib/auth-client';
 import { COUNTRIES } from '@/types';
 import { toast } from 'sonner';
 
@@ -130,6 +131,7 @@ const slideVariants = {
 
 export function OnboardingWizard() {
     const router = useRouter();
+    const searchParams = useSearchParams();
     const { setTheme } = useTheme();
     const [currentStep, setCurrentStep] = useState(1);
     const [direction, setDirection] = useState(0);
@@ -262,8 +264,19 @@ export function OnboardingWizard() {
             }
 
             toast.success('Setup complete!');
+
+            // Force session refresh so middleware sees updated user state
+            await authClient.getSession({
+                fetchOptions: {
+                    headers: {
+                        'Cache-Control': 'no-store'
+                    }
+                }
+            });
+
             // Use hard redirect to ensure session is refreshed
-            window.location.href = '/dashboard';
+            const callbackUrl = searchParams.get('callbackUrl');
+            window.location.href = callbackUrl || '/dashboard';
         } catch (error: any) {
             console.error('Onboarding error:', error);
             toast.error(error.message || 'Something went wrong. Please try again.');

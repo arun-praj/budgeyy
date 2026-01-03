@@ -12,18 +12,18 @@ export const metadata = {
 import { Suspense } from 'react';
 import { Loader2 } from 'lucide-react';
 
-export default function OnboardingPage() {
+export default function OnboardingPage(props: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }) {
     return (
         <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-muted/50 p-4">
             <Suspense fallback={<Loader2 className="h-8 w-8 animate-spin text-primary" />}>
-                <OnboardingContent />
+                <OnboardingContent searchParams={props.searchParams} />
             </Suspense>
             <Toaster />
         </div>
     );
 }
 
-async function OnboardingContent() {
+async function OnboardingContent({ searchParams }: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }) {
     // Check if user is authenticated
     const session = await auth.api.getSession({
         headers: await headers(),
@@ -37,7 +37,9 @@ async function OnboardingContent() {
     // Redirect to dashboard if onboarding is complete
     const user = session.user as { onboardingCompleted?: boolean };
     if (user?.onboardingCompleted) {
-        redirect('/dashboard');
+        const params = await searchParams;
+        const callbackUrl = params?.callbackUrl as string;
+        redirect(callbackUrl || '/dashboard');
     }
 
     return <OnboardingWizard />;
