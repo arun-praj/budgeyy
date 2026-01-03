@@ -108,6 +108,8 @@ export async function getTransactions(options: {
     end?: Date;
     categoryId?: string;
     type?: TransactionType;
+    search?: string;
+    necessityLevel?: NecessityLevel;
 } = {}) {
     const session = await auth.api.getSession({
         headers: await headers(),
@@ -128,8 +130,12 @@ export async function getTransactions(options: {
     ];
     if (options.start) conditions.push(gte(transactions.date, options.start));
     if (options.end) conditions.push(lte(transactions.date, options.end));
-    if (options.categoryId) conditions.push(eq(transactions.categoryId, options.categoryId));
+    if (options.categoryId && options.categoryId !== 'all') conditions.push(eq(transactions.categoryId, options.categoryId));
     if (options.type && options.type !== 'all' as any) conditions.push(eq(transactions.type, options.type));
+
+    // New Filters
+    if (options.search) conditions.push(sql`LOWER(${transactions.description}) LIKE ${'%' + options.search.toLowerCase() + '%'}`);
+    if (options.necessityLevel && options.necessityLevel !== 'all' as any) conditions.push(eq(transactions.necessityLevel, options.necessityLevel));
 
     // Get Data
     const data = await db.query.transactions.findMany({

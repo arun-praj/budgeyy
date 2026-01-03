@@ -57,9 +57,6 @@ const necessityColors = {
 export function TransactionsList({ transactions: initialTransactions, currency = 'USD', calendar = 'gregorian' }: TransactionsListProps) {
     const router = useRouter();
     const [transactions, setTransactions] = useState<TransactionWithUserAndCategory[]>(initialTransactions);
-    const [search, setSearch] = useState('');
-    const [typeFilter, setTypeFilter] = useState<string>('all');
-    const [necessityFilter, setNecessityFilter] = useState<string>('all');
     const [editingTransaction, setEditingTransaction] = useState<TransactionWithUserAndCategory | null>(null);
     const [viewingTransaction, setViewingTransaction] = useState<TransactionWithUserAndCategory | null>(null);
     const [isOfflineMode, setIsOfflineMode] = useState(false);
@@ -68,6 +65,9 @@ export function TransactionsList({ transactions: initialTransactions, currency =
     useEffect(() => {
         if (initialTransactions && initialTransactions.length > 0) {
             setTransactions(initialTransactions);
+        } else if (initialTransactions.length === 0) {
+            // Also sync if empty (e.g. filtered to empty)
+            setTransactions([]);
         }
     }, [initialTransactions]);
 
@@ -125,13 +125,6 @@ export function TransactionsList({ transactions: initialTransactions, currency =
         handleDataPersistence();
     }, [initialTransactions]);
 
-    const filteredTransactions = transactions.filter((tx) => {
-        const matchesSearch = tx.description?.toLowerCase().includes(search.toLowerCase()) ?? true;
-        const matchesType = typeFilter === 'all' || tx.type === typeFilter;
-        const matchesNecessity = necessityFilter === 'all' || tx.necessityLevel === necessityFilter;
-        return matchesSearch && matchesType && matchesNecessity;
-    });
-
     const handleDelete = async (e: React.MouseEvent, id: string) => {
         e.stopPropagation(); // Prevent opening the edit sheet
 
@@ -160,53 +153,16 @@ export function TransactionsList({ transactions: initialTransactions, currency =
                 </div>
             </CardHeader>
             <CardContent className="space-y-4">
-                {/* Filters */}
-                <div className="flex flex-col sm:flex-row gap-3">
-                    <div className="relative flex-1">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input
-                            placeholder="Search transactions..."
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                            className="pl-10"
-                        />
-                    </div>
-                    <div className="flex flex-row gap-3 w-full sm:w-auto">
-                        <Select value={typeFilter} onValueChange={setTypeFilter}>
-                            <SelectTrigger className="flex-1 sm:w-[150px]">
-                                <Filter className="mr-2 h-4 w-4" />
-                                <SelectValue placeholder="Type" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">All Types</SelectItem>
-                                <SelectItem value="income">Income</SelectItem>
-                                <SelectItem value="expense">Expense</SelectItem>
-                                <SelectItem value="savings">Savings</SelectItem>
-                            </SelectContent>
-                        </Select>
-                        <Select value={necessityFilter} onValueChange={setNecessityFilter}>
-                            <SelectTrigger className="flex-1 sm:w-[150px]">
-                                <SelectValue placeholder="Category" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">All Categories</SelectItem>
-                                <SelectItem value="needs">Needs</SelectItem>
-                                <SelectItem value="wants">Wants</SelectItem>
-                                <SelectItem value="savings">Savings</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
-                </div>
 
                 {/* Transactions List */}
                 <div className="space-y-2">
                     <AnimatePresence>
-                        {filteredTransactions.length === 0 ? (
+                        {transactions.length === 0 ? (
                             <div className="text-center py-8 text-muted-foreground">
                                 No transactions found
                             </div>
                         ) : (
-                            filteredTransactions.map((transaction, index) => (
+                            transactions.map((transaction, index) => (
                                 <motion.div
                                     key={transaction.id}
                                     initial={{ opacity: 0, y: 10 }}
