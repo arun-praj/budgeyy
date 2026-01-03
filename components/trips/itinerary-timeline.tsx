@@ -537,7 +537,7 @@ export function ItineraryTimeline({ items, categories = [], tripId, members = []
                                     </h3>
                                     {/* Editable Title & Location - Now Stacked */}
                                     <div className="w-full">
-                                        <ItineraryTitleEditor id={item.id} initialTitle={item.title} initialLocation={item.location} />
+                                        <ItineraryTitleEditor id={item.id} initialTitle={item.title} initialLocation={item.location} readOnly={readOnly} />
                                     </div>
 
                                     {/* Menu - Absolute Top Right */}
@@ -723,6 +723,7 @@ export function ItineraryTimeline({ items, categories = [], tripId, members = []
                                                                     createdAt={unifiedItem.data.createdAt}
                                                                     onDelete={() => handleDeleteNote(unifiedItem.id)}
                                                                     creator={unifiedItem.data.user} // Pass creator
+                                                                    readOnly={readOnly}
                                                                 />
                                                             )}
 
@@ -731,6 +732,7 @@ export function ItineraryTimeline({ items, categories = [], tripId, members = []
                                                                     checklist={unifiedItem.data}
                                                                     onDelete={() => handleDeleteChecklist(unifiedItem.id)}
                                                                     creator={unifiedItem.data.user} // Pass creator
+                                                                    readOnly={readOnly}
                                                                 />
                                                             )}
                                                         </div>
@@ -763,48 +765,50 @@ export function ItineraryTimeline({ items, categories = [], tripId, members = []
                                 </Droppable>
 
                                 {/* Quick Add Toolbar - Left Aligned, Upgraded */}
-                                <div className="relative group/item -mt-3 opacity-70 hover:opacity-100 transition-opacity focus-within:opacity-100 pb-2">
-                                    {/* Connector - Shortened */}
-                                    <div className="absolute -left-10 top-0 h-[13px] w-10 border-b-2 border-l-2 border-gray-200 dark:border-gray-800 rounded-bl-xl" />
+                                {!readOnly && (
+                                    <div className="relative group/item -mt-3 opacity-70 hover:opacity-100 transition-opacity focus-within:opacity-100 pb-2">
+                                        {/* Connector - Shortened */}
+                                        <div className="absolute -left-10 top-0 h-[13px] w-10 border-b-2 border-l-2 border-gray-200 dark:border-gray-800 rounded-bl-xl" />
 
-                                    <div className="flex items-start gap-3">
-                                        {/* Dot/Icon */}
-                                        <div className="h-6 w-6 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-400 flex items-center justify-center shrink-0">
-                                            <div className="h-2 w-2 rounded-full bg-current" />
-                                        </div>
+                                        <div className="flex items-start gap-3">
+                                            {/* Dot/Icon */}
+                                            <div className="h-6 w-6 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-400 flex items-center justify-center shrink-0">
+                                                <div className="h-2 w-2 rounded-full bg-current" />
+                                            </div>
 
-                                        {/* Action Icons - Reverted to left-aligned */}
-                                        <div className="flex items-center gap-2">
-                                            <Button
-                                                variant="outline"
-                                                size="icon"
-                                                className="h-9 w-9 rounded-full bg-background border shadow-sm text-muted-foreground hover:text-emerald-600 hover:border-emerald-200 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-all"
-                                                onClick={() => handleCreateNote(item.id)}
-                                                title="Add Note"
-                                            >
-                                                <StickyNote className="h-4 w-4" />
-                                            </Button>
-                                            <Button
-                                                variant="outline"
-                                                size="icon"
-                                                className="h-9 w-9 rounded-full bg-background border shadow-sm text-muted-foreground hover:text-emerald-600 hover:border-emerald-200 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-all"
-                                                onClick={() => handleOpenDialog('checklist', item.id, item.tripId)}
-                                                title="Add Checklist"
-                                            >
-                                                <CheckSquare className="h-4 w-4" />
-                                            </Button>
-                                            <Button
-                                                variant="outline"
-                                                size="icon"
-                                                className="h-9 w-9 rounded-full bg-background border shadow-sm text-muted-foreground hover:text-emerald-600 hover:border-emerald-200 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-all"
-                                                onClick={() => handleOpenDialog('expense', item.id, item.tripId)}
-                                                title="Add Expense"
-                                            >
-                                                <DollarSign className="h-4 w-4" />
-                                            </Button>
+                                            {/* Action Icons - Reverted to left-aligned */}
+                                            <div className="flex items-center gap-2">
+                                                <Button
+                                                    variant="outline"
+                                                    size="icon"
+                                                    className="h-9 w-9 rounded-full bg-background border shadow-sm text-muted-foreground hover:text-emerald-600 hover:border-emerald-200 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-all"
+                                                    onClick={() => handleCreateNote(item.id)}
+                                                    title="Add Note"
+                                                >
+                                                    <StickyNote className="h-4 w-4" />
+                                                </Button>
+                                                <Button
+                                                    variant="outline"
+                                                    size="icon"
+                                                    className="h-9 w-9 rounded-full bg-background border shadow-sm text-muted-foreground hover:text-emerald-600 hover:border-emerald-200 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-all"
+                                                    onClick={() => handleOpenDialog('checklist', item.id, item.tripId)}
+                                                    title="Add Checklist"
+                                                >
+                                                    <CheckSquare className="h-4 w-4" />
+                                                </Button>
+                                                <Button
+                                                    variant="outline"
+                                                    size="icon"
+                                                    className="h-9 w-9 rounded-full bg-background border shadow-sm text-muted-foreground hover:text-emerald-600 hover:border-emerald-200 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-all"
+                                                    onClick={() => handleOpenDialog('expense', item.id, item.tripId)}
+                                                    title="Add Expense"
+                                                >
+                                                    <DollarSign className="h-4 w-4" />
+                                                </Button>
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
+                                )}
                             </div>
                         </div>
                     );
@@ -1059,7 +1063,7 @@ export function ItineraryTimeline({ items, categories = [], tripId, members = []
 }
 
 // ... ItineraryTitleEditor remains the same ...
-function ItineraryTitleEditor({ id, initialTitle, initialLocation }: { id: string; initialTitle: string | null, initialLocation: string | null }) {
+function ItineraryTitleEditor({ id, initialTitle, initialLocation, readOnly = false }: { id: string; initialTitle: string | null, initialLocation: string | null, readOnly?: boolean }) {
     const [title, setTitle] = useState(initialTitle || '');
     const [location, setLocation] = useState(initialLocation || '');
     const [isEditing, setIsEditing] = useState(false);
@@ -1122,8 +1126,11 @@ function ItineraryTitleEditor({ id, initialTitle, initialLocation }: { id: strin
 
     return (
         <div
-            onClick={() => setIsEditing(true)}
-            className="group/title flex items-center flex-wrap gap-2 mt-0 cursor-pointer hover:bg-muted/30 p-1 -ml-1 rounded px-2 w-fit transition-colors max-w-full"
+            onClick={() => !readOnly && setIsEditing(true)}
+            className={cn(
+                "group/title flex items-center flex-wrap gap-2 mt-0 p-1 -ml-1 rounded px-2 w-fit transition-colors max-w-full",
+                !readOnly ? "cursor-pointer hover:bg-muted/30" : "cursor-default"
+            )}
         >
             {title ? (
                 <span className="font-medium text-foreground">{title}</span>
@@ -1146,7 +1153,9 @@ function ItineraryTitleEditor({ id, initialTitle, initialLocation }: { id: strin
                     Add location
                 </span>
             )}
-            <Pencil className="h-3 w-3 text-muted-foreground/0 group-hover/title:text-muted-foreground/50 transition-colors ml-1" />
+            {!readOnly && (
+                <Pencil className="h-3 w-3 text-muted-foreground/0 group-hover/title:text-muted-foreground/50 transition-colors ml-1" />
+            )}
         </div>
     );
 }
@@ -1163,6 +1172,7 @@ function ItineraryNoteEditor({
     onDelete,
     createdAt,
     creator, // Destructure creator
+    readOnly = false,
 }: {
     id?: string;
     createdAt?: string | Date;
@@ -1174,6 +1184,7 @@ function ItineraryNoteEditor({
     onNoteCreated?: () => void;
     onDelete?: () => void;
     creator?: { name?: string | null; email: string; avatar?: string | null }; // Add creator prop type
+    readOnly?: boolean;
 }) {
     const [content, setContent] = useState(initialContent);
     const [isPriority, setIsPriority] = useState(initialPriority);
@@ -1253,12 +1264,13 @@ function ItineraryNoteEditor({
                 )}>
                     {/* Icon - Left Side */}
                     <div
-                        onClick={togglePriority}
+                        onClick={(e) => !readOnly && togglePriority(e)}
                         className={cn(
-                            "shrink-0 cursor-pointer transition-transform active:scale-95 hover:scale-110 mt-0.5",
+                            "shrink-0 transition-transform mt-0.5",
+                            !readOnly ? "cursor-pointer active:scale-95 hover:scale-110" : "cursor-default",
                             isPriority ? "text-red-500" : "text-yellow-600/80"
                         )}
-                        title="Toggle Priority"
+                        title={!readOnly ? "Toggle Priority" : undefined}
                     >
                         {isPriority ? <AlertCircle className="h-4 w-4" /> : <StickyNote className="h-4 w-4" />}
                     </div>
@@ -1297,7 +1309,7 @@ function ItineraryNoteEditor({
                                 {status === 'saved' && <Check className="h-3 w-3 text-emerald-500/60" />}
 
                                 {/* Delete Button */}
-                                {!isNew && (
+                                {!isNew && !readOnly && (
                                     <Button
                                         variant="ghost"
                                         size="icon"
@@ -1319,11 +1331,13 @@ function ItineraryNoteEditor({
                                     setIsExpanded(true);
                                 }}
                                 onFocus={() => setIsExpanded(true)}
-                                placeholder="Write a note..."
+                                placeholder={!readOnly ? "Write a note..." : ""}
+                                readOnly={readOnly}
                                 className={cn(
                                     "bg-transparent border-0 focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none p-0 text-sm resize-none leading-relaxed w-full placeholder:text-muted-foreground/60 focus:placeholder:text-muted-foreground/30 min-h-[22px] transition-[height]",
                                     "text-foreground/90",
-                                    !isExpanded && isOverflowing ? "max-h-[80px] overflow-hidden" : "h-auto"
+                                    !isExpanded && isOverflowing ? "max-h-[80px] overflow-hidden" : "h-auto",
+                                    readOnly ? "cursor-default" : "cursor-text"
                                 )}
                                 rows={1}
                                 autoFocus={isNew}
@@ -1358,10 +1372,11 @@ function ItineraryNoteEditor({
 }
 
 // Checklist Editor Component
-function ItineraryChecklistEditor({ checklist, onDelete, creator }: {
+function ItineraryChecklistEditor({ checklist, onDelete, creator, readOnly = false }: {
     checklist: any,
     onDelete: () => void,
-    creator?: { name?: string | null; email: string; avatar?: string | null } // Add creator prop
+    creator?: { name?: string | null; email: string; avatar?: string | null }, // Add creator prop
+    readOnly?: boolean
 }) {
     // Parse items safely
     const initialItems = useMemo(() => {
@@ -1448,23 +1463,26 @@ function ItineraryChecklistEditor({ checklist, onDelete, creator }: {
                             {isSaving && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
                         </div>
                         <div className="flex items-center gap-1">
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-6 w-6 opacity-0 group-hover/item:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
-                                onClick={onDelete}
-                            >
-                                <Trash2 className="h-3 w-3" />
-                            </Button>
+                            {!readOnly && (
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6 opacity-0 group-hover/item:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
+                                    onClick={onDelete}
+                                >
+                                    <Trash2 className="h-3 w-3" />
+                                </Button>
+                            )}
                         </div>
                     </div>
                     <div className="space-y-2">
                         {displayedItems.map((checkItem: any, i: number) => (
                             <div key={i} className="flex items-center gap-2 text-sm group/checkitem py-0.5">
                                 <div
-                                    onClick={() => handleToggle(i)}
+                                    onClick={() => !readOnly && handleToggle(i)}
                                     className={cn(
-                                        "h-4 w-4 rounded-full border cursor-pointer flex items-center justify-center transition-colors shrink-0",
+                                        "h-4 w-4 rounded-full border flex items-center justify-center transition-colors shrink-0",
+                                        !readOnly ? "cursor-pointer" : "cursor-default",
                                         checkItem.checked
                                             ? "bg-black border-black text-white dark:bg-white dark:border-white dark:text-black"
                                             : "border-muted-foreground/30 hover:border-black/50 dark:hover:border-white/50"
@@ -1474,18 +1492,23 @@ function ItineraryChecklistEditor({ checklist, onDelete, creator }: {
                                 </div>
                                 <span className={cn(
                                     "flex-1 transition-all break-all",
-                                    checkItem.checked ? "line-through text-muted-foreground/50" : "text-foreground"
-                                )}>
+                                    checkItem.checked ? "line-through text-muted-foreground/50" : "text-foreground",
+                                    readOnly ? "cursor-default" : "cursor-pointer"
+                                )}
+                                    onClick={() => !readOnly && handleToggle(i)}
+                                >
                                     {checkItem.text}
                                 </span>
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-5 w-5 opacity-0 group-hover/checkitem:opacity-100 transition-opacity text-muted-foreground/40 hover:text-destructive -mr-1"
-                                    onClick={(e) => handleRemoveItem(e, i)}
-                                >
-                                    <X className="h-3 w-3" />
-                                </Button>
+                                {!readOnly && (
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-5 w-5 opacity-0 group-hover/checkitem:opacity-100 transition-opacity text-muted-foreground/40 hover:text-destructive -mr-1"
+                                        onClick={(e) => handleRemoveItem(e, i)}
+                                    >
+                                        <X className="h-3 w-3" />
+                                    </Button>
+                                )}
                             </div>
                         ))}
 
@@ -1507,16 +1530,18 @@ function ItineraryChecklistEditor({ checklist, onDelete, creator }: {
                             </div>
                         )}
 
-                        <div className="flex items-center gap-2 pt-1 pl-0.5">
-                            <Plus className="h-3.5 w-3.5 text-muted-foreground/50 shrink-0" />
-                            <Input
-                                placeholder="Add item..."
-                                value={newItemText}
-                                onChange={(e) => setNewItemText(e.target.value)}
-                                onKeyDown={handleAddItem}
-                                className="h-7 text-xs border-0 bg-transparent shadow-none px-0 placeholder:text-muted-foreground/50 focus-visible:ring-0 focus-visible:ring-offset-0"
-                            />
-                        </div>
+                        {!readOnly && (
+                            <div className="flex items-center gap-2 pt-1 pl-0.5">
+                                <Plus className="h-3.5 w-3.5 text-muted-foreground/50 shrink-0" />
+                                <Input
+                                    placeholder="Add item..."
+                                    value={newItemText}
+                                    onChange={(e) => setNewItemText(e.target.value)}
+                                    onKeyDown={handleAddItem}
+                                    className="h-7 text-xs border-0 bg-transparent shadow-none px-0 placeholder:text-muted-foreground/50 focus-visible:ring-0 focus-visible:ring-offset-0"
+                                />
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>

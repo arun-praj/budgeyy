@@ -18,13 +18,23 @@ export async function middleware(request: NextRequest) {
     const isAuthRoute = authRoutes.some(route => pathname === route);
 
     // Get session from server
-    const response = await fetch(new URL('/api/auth/get-session', request.url), {
-        headers: {
-            cookie: request.headers.get('cookie') || '',
-        },
-    });
-    const session = await response.json();
-    const hasSession = !!session?.user;
+    let hasSession = false;
+    let session: any = null;
+
+    try {
+        const response = await fetch(new URL('/api/auth/get-session', request.url), {
+            headers: {
+                cookie: request.headers.get('cookie') || '',
+            },
+        });
+
+        if (response.ok) {
+            session = await response.json();
+            hasSession = !!session?.user;
+        }
+    } catch (error) {
+        console.error('Middleware: Error fetching session:', error);
+    }
 
     // Redirect unauthenticated users to login (if not a public route)
     if (!hasSession) {

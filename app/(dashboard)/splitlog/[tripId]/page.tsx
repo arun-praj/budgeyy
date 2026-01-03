@@ -159,18 +159,23 @@ export default async function TripDetailsPage(props: TripDetailsPageProps) {
                     href="/splitlog"
                     className="absolute top-4 left-4 z-20 bg-black/50 hover:bg-black/70 text-white rounded-full p-2 transition-colors backdrop-blur-sm"
                 >
-                    <div className="absolute inset-0 bg-black/10" />
+                    <ArrowLeft className="h-5 w-5" />
+                </Link>
 
-                    {/* Back Button - Top Left */}
-                    <Link
-                        href="/splitlog"
-                        className="absolute top-4 left-4 z-20 bg-black/50 hover:bg-black/70 text-white rounded-full p-2 transition-colors backdrop-blur-sm"
-                    >
-                        <ArrowLeft className="h-5 w-5" />
-                    </Link>
+                <div className="absolute top-4 right-4 z-20 flex gap-2">
+                    {/* Share Button (Creator only) */}
+                    {isCreator && (
+                        <ShareTripDialog
+                            tripId={trip.id}
+                            isPublic={trip.isPublic}
+                            shareId={trip.shareId}
+                            showText={false}
+                        />
+                    )}
 
-                    {/* Edit Background Button - Top Right */}
+                    {/* Edit Background Button */}
                     <BackgroundSelectorWrapper tripId={params.tripId} currentImage={trip.imageUrl} />
+                </div>
             </div>
 
             <div className="container max-w-5xl mx-auto px-4 -mt-16 relative z-10">
@@ -235,25 +240,6 @@ export default async function TripDetailsPage(props: TripDetailsPageProps) {
                                 })}
                             </TooltipProvider>
 
-                            {/* Share Button (Creator only) */}
-                            {isCreator && (
-                                <TooltipProvider>
-                                    <Tooltip>
-                                        <TooltipTrigger asChild>
-                                            <div className="ml-2">
-                                                <ShareTripDialog
-                                                    tripId={trip.id}
-                                                    isPublic={trip.isPublic}
-                                                    shareId={trip.shareId}
-                                                />
-                                            </div>
-                                        </TooltipTrigger>
-                                        <TooltipContent>
-                                            <p>Share trip publicly</p>
-                                        </TooltipContent>
-                                    </Tooltip>
-                                </TooltipProvider>
-                            )}
 
                             {/* Invite Button */}
                             <TooltipProvider>

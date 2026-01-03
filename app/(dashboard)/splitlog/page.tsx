@@ -8,6 +8,7 @@ import { format } from 'date-fns';
 import Image from 'next/image';
 import Link from 'next/link';
 import { TripActionsDropdown } from '@/components/trips/trip-actions-dropdown';
+import { ShareTripDialog } from '@/components/trips/share-trip-dialog';
 import { auth } from '@/lib/auth';
 import { headers } from 'next/headers';
 
@@ -74,9 +75,17 @@ async function TripsContent() {
                                     </div>
                                 )}
                                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-                                <div className="absolute top-4 right-4 z-20">
+                                <div className="absolute top-4 right-4 z-20 flex gap-2">
                                     {trip.userId === session?.user?.id && (
-                                        <TripActionsDropdown tripId={trip.id} tripName={trip.name} />
+                                        <>
+                                            <ShareTripDialog
+                                                tripId={trip.id}
+                                                isPublic={trip.isPublic || false}
+                                                shareId={trip.shareId || null}
+                                                showText={false}
+                                            />
+                                            <TripActionsDropdown tripId={trip.id} tripName={trip.name} />
+                                        </>
                                     )}
                                 </div>
                                 <div className="absolute bottom-4 left-4 text-white">

@@ -10,20 +10,28 @@ import {
     DialogTrigger,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Switch } from '@/components/ui/switch';
+import { Switch } from '../ui/switch';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Share2, Copy, Check, Globe, Lock } from 'lucide-react';
 import { toggleTripPublic } from '@/actions/trips';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 interface ShareTripDialogProps {
     tripId: string;
     isPublic: boolean;
     shareId: string | null;
+    showText?: boolean;
 }
 
-export function ShareTripDialog({ tripId, isPublic: initialIsPublic, shareId: initialShareId }: ShareTripDialogProps) {
+export function ShareTripDialog({ tripId, isPublic: initialIsPublic, shareId: initialShareId, showText = true }: ShareTripDialogProps) {
     const [isPublic, setIsPublic] = useState(initialIsPublic);
     const [shareId, setShareId] = useState(initialShareId);
     const [isLoading, setIsLoading] = useState(false);
@@ -57,15 +65,43 @@ export function ShareTripDialog({ tripId, isPublic: initialIsPublic, shareId: in
         setTimeout(() => setCopied(false), 2000);
     };
 
+    const triggerButton = (
+        <Button
+            variant="outline"
+            size={showText ? "sm" : "icon"}
+            className={cn("gap-2", !showText && "h-auto w-auto p-2 rounded-full bg-black/50 hover:bg-black/70 text-white border-0 backdrop-blur-sm")}
+            onClick={(e) => {
+                // Prevent bubbling to parent Link components
+                e.preventDefault();
+                e.stopPropagation();
+            }}
+        >
+            <Share2 className={cn("h-4 w-4", !showText && "h-5 w-5 text-white")} />
+            {showText && "Share"}
+        </Button>
+    );
+
     return (
         <Dialog>
-            <DialogTrigger asChild>
-                <Button variant="outline" size="sm" className="gap-2">
-                    <Share2 className="h-4 w-4" />
-                    Share
-                </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-md">
+            {showText ? (
+                <DialogTrigger asChild>
+                    {triggerButton}
+                </DialogTrigger>
+            ) : (
+                <TooltipProvider>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <DialogTrigger asChild>
+                                {triggerButton}
+                            </DialogTrigger>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            <p>Share trip</p>
+                        </TooltipContent>
+                    </Tooltip>
+                </TooltipProvider>
+            )}
+            <DialogContent className="sm:max-w-md" onClick={(e) => e.stopPropagation()}>
                 <DialogHeader>
                     <DialogTitle>Share Trip</DialogTitle>
                     <DialogDescription>
