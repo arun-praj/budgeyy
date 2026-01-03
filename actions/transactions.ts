@@ -293,6 +293,44 @@ export async function createCategory(data: { name: string; type: TransactionType
     }
 }
 
+export async function updateCategory(id: string, data: { name: string; type: TransactionType; icon?: string }) {
+    const session = await auth.api.getSession({
+        headers: await headers(),
+    });
+
+    if (!session?.user?.id) {
+        return { error: 'Unauthorized' };
+    }
+
+    try {
+        const [updated] = await db
+            .update(categories)
+            .set({
+                name: data.name,
+                type: data.type,
+                icon: data.icon,
+                // userId check is in the where clause, so we don't need to update it
+            })
+            .where(
+                and(
+                    eq(categories.id, id),
+                    eq(categories.userId, session.user.id)
+                )
+            )
+            .returning();
+
+        if (!updated) {
+            return { error: 'Category not found or unauthorized' };
+        }
+
+        revalidatePath('/categories');
+        return { success: true, data: updated };
+    } catch (error) {
+        console.error('Failed to update category:', error);
+        return { error: 'Failed to update category' };
+    }
+}
+
 export async function deleteCategory(id: string) {
     const session = await auth.api.getSession({
         headers: await headers(),

@@ -16,6 +16,7 @@ import {
 import { Trash2, ArrowUpRight, ArrowDownLeft, Wallet } from 'lucide-react';
 import { toast } from 'sonner';
 import { CreateCategoryDialog } from './create-category-dialog';
+import { EditCategoryDialog } from './edit-category-dialog';
 
 interface Category {
     id: string;
@@ -92,14 +93,20 @@ export function CategoryManager() {
                                 <TableCell className="font-medium">{category.name}</TableCell>
                                 <TableCell className="text-right">
                                     {!category.isDefault && (
-                                        <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            onClick={() => handleDelete(category.id, category.name)}
-                                            className="text-muted-foreground hover:text-destructive"
-                                        >
-                                            <Trash2 className="h-4 w-4" />
-                                        </Button>
+                                        <>
+                                            <EditCategoryDialog
+                                                category={category}
+                                                onSuccess={fetchCategories}
+                                            />
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                onClick={() => handleDelete(category.id, category.name)}
+                                                className="text-muted-foreground hover:text-destructive"
+                                            >
+                                                <Trash2 className="h-4 w-4" />
+                                            </Button>
+                                        </>
                                     )}
                                 </TableCell>
                             </TableRow>

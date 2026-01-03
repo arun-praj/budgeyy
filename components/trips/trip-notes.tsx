@@ -11,9 +11,10 @@ import { cn } from '@/lib/utils';
 interface TripNotesProps {
     tripId: string;
     initialNotes?: string | null;
+    readOnly?: boolean;
 }
 
-export function TripNotes({ tripId, initialNotes }: TripNotesProps) {
+export function TripNotes({ tripId, initialNotes, readOnly = false }: TripNotesProps) {
     const [notes, setNotes] = useState(initialNotes || '');
     const [isSaving, setIsSaving] = useState(false);
     const timeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -69,10 +70,13 @@ export function TripNotes({ tripId, initialNotes }: TripNotesProps) {
                     <Textarea
                         value={notes}
                         onChange={handleChange}
-                        placeholder="Add trip details..."
+                        disabled={readOnly}
+                        readOnly={readOnly}
+                        placeholder={readOnly ? "No notes added." : "Add trip details..."}
                         className={cn(
                             "bg-transparent border-0 focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none p-0 text-sm resize-none leading-relaxed w-full placeholder:text-muted-foreground/60 focus:placeholder:text-muted-foreground/30 min-h-[22px]",
-                            "text-foreground/90"
+                            "text-foreground/90",
+                            readOnly && "cursor-default resize-none focus:ring-0"
                         )}
                         rows={1}
                         onInput={(e) => {
