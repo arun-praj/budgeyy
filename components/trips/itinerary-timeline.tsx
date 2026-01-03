@@ -843,21 +843,24 @@ export function ItineraryTimeline({ items, categories = [], tripId, members = []
                         <div className="w-8 h-8" />
                     </div>
 
-                    <div className="flex-1 pb-10">
-                        <Button
-                            variant="ghost"
-                            className="w-full h-12 border-2 border-dashed border-muted hover:border-emerald-500/50 hover:bg-emerald-50/50 dark:hover:bg-emerald-900/10 text-muted-foreground hover:text-emerald-600 transition-all rounded-xl gap-2 group/btn"
-                            onClick={handleAddDay}
-                            disabled={isAddingDay}
-                        >
-                            {isAddingDay ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                                <Plus className="h-4 w-4 group-hover/btn:scale-110 transition-transform" />
-                            )}
-                            Add Another Day
-                        </Button>
-                    </div>
+                    {/* Add Day Button */}
+                    {!readOnly && (
+                        <div className="flex-1 pb-10">
+                            <Button
+                                variant="ghost"
+                                className="w-full h-12 border-2 border-dashed border-muted hover:border-emerald-500/50 hover:bg-emerald-50/50 dark:hover:bg-emerald-900/10 text-muted-foreground hover:text-emerald-600 transition-all rounded-xl gap-2 group/btn"
+                                onClick={handleAddDay}
+                                disabled={isAddingDay}
+                            >
+                                {isAddingDay ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                    <Plus className="h-4 w-4 group-hover/btn:scale-110 transition-transform" />
+                                )}
+                                Add Another Day
+                            </Button>
+                        </div>
+                    )}
                 </div>
 
                 {/* Dialogs */}

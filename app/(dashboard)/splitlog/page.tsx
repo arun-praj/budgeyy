@@ -9,6 +9,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { TripActionsDropdown } from '@/components/trips/trip-actions-dropdown';
 import { ShareTripDialog } from '@/components/trips/share-trip-dialog';
+import { TripCardActions } from '@/components/trips/trip-card-actions';
 import { auth } from '@/lib/auth';
 import { headers } from 'next/headers';
 
@@ -75,13 +76,7 @@ async function TripsContent() {
                                     </div>
                                 )}
                                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-                                <div
-                                    className="absolute top-4 right-4 z-20 flex gap-2"
-                                    onClick={(e) => {
-                                        e.preventDefault();
-                                        e.stopPropagation();
-                                    }}
-                                >
+                                <TripCardActions>
                                     {trip.userId === session?.user?.id && (
                                         <>
                                             <ShareTripDialog
@@ -93,7 +88,7 @@ async function TripsContent() {
                                             <TripActionsDropdown tripId={trip.id} tripName={trip.name} />
                                         </>
                                     )}
-                                </div>
+                                </TripCardActions>
                                 <div className="absolute bottom-4 left-4 text-white">
                                     <h3 className="font-bold text-lg">{trip.name}</h3>
                                     {trip.destination && (
