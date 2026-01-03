@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { ArrowRight, PiggyBank, BarChart3, Shield, Wallet } from 'lucide-react';
+import { ArrowRight, PiggyBank, BarChart3, Shield, Wallet, Map as MapIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Metadata } from 'next';
 
@@ -34,8 +34,12 @@ export default function LandingPage() {
       {/* Hero Section */}
       <main className="container mx-auto px-4 py-20 md:py-32">
         <div className="max-w-3xl mx-auto text-center space-y-8">
-          <div className="inline-flex items-center rounded-full border px-4 py-1.5 text-sm bg-muted/50">
-            <span className="text-muted-foreground">✨ Now with Nepali Calendar Support</span>
+          <div className="inline-flex items-center gap-2 rounded-full border px-4 py-1.5 text-sm bg-muted/50">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
+            </span>
+            <span className="text-muted-foreground">New: SplitLog Trip Planner & Itinerary Builder</span>
           </div>
 
           <h1 className="text-4xl md:text-6xl font-bold tracking-tight">
@@ -45,7 +49,7 @@ export default function LandingPage() {
 
           <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto">
             Track your income, manage expenses, and build healthy savings habits.
-            Budgeyy makes personal finance simple, visual, and actually enjoyable.
+            Now featuring <span className="text-foreground font-medium">SplitLog</span> for shared trip expenses and planning.
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
@@ -65,7 +69,7 @@ export default function LandingPage() {
 
         {/* Features */}
         <div className="grid md:grid-cols-3 gap-8 mt-32">
-          <div className="text-center space-y-4 p-6 rounded-2xl bg-card border">
+          <div className="text-center space-y-4 p-6 rounded-2xl bg-card border hover:shadow-md transition-shadow">
             <div className="mx-auto w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center">
               <PiggyBank className="h-6 w-6 text-blue-500" />
             </div>
@@ -76,7 +80,18 @@ export default function LandingPage() {
             </p>
           </div>
 
-          <div className="text-center space-y-4 p-6 rounded-2xl bg-card border">
+          <div className="text-center space-y-4 p-6 rounded-2xl bg-card border hover:shadow-md transition-shadow">
+            <div className="mx-auto w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
+              <MapIcon className="h-6 w-6 text-primary" />
+            </div>
+            <h3 className="text-xl font-semibold">SplitLog: Trip Planning</h3>
+            <p className="text-muted-foreground">
+              Plan adventures with shared expenses, interactive itineraries, and
+              custom journey backgrounds. Perfect for groups.
+            </p>
+          </div>
+
+          <div className="text-center space-y-4 p-6 rounded-2xl bg-card border hover:shadow-md transition-shadow">
             <div className="mx-auto w-12 h-12 rounded-xl bg-purple-500/10 flex items-center justify-center">
               <BarChart3 className="h-6 w-6 text-purple-500" />
             </div>
@@ -86,16 +101,53 @@ export default function LandingPage() {
               understand your spending patterns at a glance.
             </p>
           </div>
+        </div>
 
-          <div className="text-center space-y-4 p-6 rounded-2xl bg-card border">
-            <div className="mx-auto w-12 h-12 rounded-xl bg-emerald-500/10 flex items-center justify-center">
-              <Shield className="h-6 w-6 text-emerald-500" />
+        {/* Feature Spotlight: SplitLog */}
+        <div className="mt-32 rounded-3xl border bg-card/50 overflow-hidden">
+          <div className="grid md:grid-cols-2 items-center">
+            <div className="p-8 md:p-12 space-y-6">
+              <div className="inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium bg-primary/10 text-primary">
+                NEW FEATURE
+              </div>
+              <h2 className="text-3xl md:text-4xl font-bold">Plan Your Next Journey with SplitLog</h2>
+              <p className="text-lg text-muted-foreground">
+                More than just a budget tracker. Organize trips, build day-by-day itineraries,
+                and split costs effortlessly with travel companions.
+              </p>
+              <ul className="space-y-3">
+                {[
+                  'Interactive Trip Timelines',
+                  'Shared Expense Tracking',
+                  'Custom Trip Backgrounds',
+                  'Collaborative Planning'
+                ].map((item) => (
+                  <li key={item} className="flex items-center gap-2">
+                    <div className="h-1.5 w-1.5 rounded-full bg-primary" />
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+              <Button variant="outline" className="mt-4" asChild>
+                <Link href="/register">Try Trip Planner</Link>
+              </Button>
             </div>
-            <h3 className="text-xl font-semibold">Secure & Private</h3>
-            <p className="text-muted-foreground">
-              Your financial data stays yours. End-to-end encryption and
-              secure authentication keep your information safe.
-            </p>
+            <div className="bg-muted min-h-[300px] flex items-center justify-center p-8">
+              <div className="relative w-full aspect-video rounded-xl border bg-background shadow-2xl overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-primary/20 flex items-center justify-center">
+                  <MapIcon className="h-20 w-20 text-primary/20" />
+                </div>
+                {/* Simulated UI */}
+                <div className="absolute top-4 left-4 right-4 flex items-center justify-between">
+                  <div className="h-4 w-24 rounded bg-muted animate-pulse" />
+                  <div className="h-8 w-8 rounded-full bg-muted animate-pulse" />
+                </div>
+                <div className="absolute bottom-8 left-8 space-y-2">
+                  <div className="h-6 w-48 rounded bg-muted animate-pulse" />
+                  <div className="h-3 w-32 rounded bg-muted animate-pulse" />
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 

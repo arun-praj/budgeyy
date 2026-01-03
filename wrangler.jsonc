@@ -1,0 +1,61 @@
+{
+    "$schema": "node_modules/wrangler/config-schema.json",
+    "main": ".open-next/worker.js",
+    "name": "my-app",
+    "compatibility_date": "2024-12-30",
+    "compatibility_flags": [
+        // Enable Node.js API
+        // see https://developers.cloudflare.com/workers/configuration/compatibility-flags/#nodejs-compatibility-flag
+        "nodejs_compat",
+        // Allow to fetch URLs in your app
+        // see https://developers.cloudflare.com/workers/configuration/compatibility-flags/#global-fetch-strictly-public
+        "global_fetch_strictly_public",
+    ],
+    "assets": {
+        "directory": ".open-next/assets",
+        "binding": "ASSETS",
+    },
+    "services": [
+        {
+            "binding": "WORKER_SELF_REFERENCE",
+            // The service should match the "name" of your worker
+            "service": "my-app",
+        },
+    ],
+    "r2_buckets": [
+        // Create a R2 binding with the binding name "NEXT_INC_CACHE_R2_BUCKET"
+        {
+            "binding": "NEXT_INC_CACHE_R2_BUCKET",
+            "bucket_name": "budgeyy-cache",
+        },
+    ],
+    // DO Queue
+    "durable_objects": {
+        "bindings": [
+            {
+                "name": "NEXT_CACHE_DO_QUEUE",
+                "class_name": "DOQueueHandler",
+            },
+        ],
+    },
+    "migrations": [
+        {
+            "tag": "v1",
+            "new_sqlite_classes": [
+                "DOQueueHandler"
+            ],
+        },
+    ],
+    "d1_databases": [
+        {
+            "binding": "NEXT_TAG_CACHE_D1",
+            "database_id": "5dc3a433-fb5e-4cd9-af4a-32702211ee68",
+            "database_name": "budgyy_cache_db",
+        },
+    ],
+    "images": {
+        // Enable image optimization
+        // see https://opennext.js.org/cloudflare/howtos/image
+        "binding": "IMAGES",
+    },
+}
