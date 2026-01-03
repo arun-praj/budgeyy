@@ -1,7 +1,7 @@
 'use server';
 
 import { db } from '@/db';
-import { trips, tripTransactions, tripInvites } from '@/db/schema';
+import { trips, tripTransactions, tripInvites, users } from '@/db/schema';
 import * as schema from '@/db/schema';
 import { eq, desc, and, inArray, gt, sql, lte, or } from 'drizzle-orm';
 import { auth } from '@/lib/auth';
@@ -1281,7 +1281,33 @@ export async function getPublicTrip(shareId: string) {
         }
     });
 
-    return trip;
+    if (!trip) return null;
+
+    // Fetch details for accepted invitees
+    const acceptedEmails = trip.invites
+        .filter(i => i.status === 'accepted')
+        .map(i => i.email);
+
+    let acceptedUsers: any[] = [];
+    if (acceptedEmails.length > 0) {
+        acceptedUsers = await db.select({
+            id: users.id,
+            name: users.name,
+            email: users.email,
+            image: users.image,
+            avatar: users.avatar
+        })
+            .from(users)
+            .where(inArray(users.email, acceptedEmails));
+    }
+
+    // specific members array construction
+    const members = [
+        { ...trip.user, isGuest: false },
+        ...acceptedUsers.map(u => ({ ...u, isGuest: false }))
+    ];
+
+    return { trip, members };
 }
 
 export async function inviteMember(tripId: string, email: string) {

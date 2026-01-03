@@ -9,6 +9,7 @@ import { TripNotes } from '@/components/trips/trip-notes';
 import { ItineraryTimeline } from '@/components/trips/itinerary-timeline';
 import { TripExpenses } from '@/components/trips/trip-expenses';
 import { MemberAvatarAction } from '@/components/trips/member-avatar-action';
+import { cn } from '@/lib/utils';
 
 interface PublicTripPageProps {
     params: {
@@ -18,11 +19,13 @@ interface PublicTripPageProps {
 
 export default async function PublicTripPage(props: PublicTripPageProps) {
     const params = await props.params;
-    const trip = await getPublicTrip(params.shareId);
+    const data = await getPublicTrip(params.shareId);
 
-    if (!trip) {
+    if (!data) {
         notFound();
     }
+
+    const { trip, members } = data;
 
     const hasImage = !!trip.imageUrl;
     const headerStyle = hasImage
@@ -43,32 +46,6 @@ export default async function PublicTripPage(props: PublicTripPageProps) {
             };
         }
     };
-
-    // Construct members list for public view (read-only)
-    // For public view, we don't need complex guest logic, just display
-    const memberUsers = [{
-        ...trip.user,
-        image: trip.user.avatar,
-        isGuest: false
-    }];
-
-    // Add accepted invitees
-    trip.invites.forEach(invite => {
-        if (invite.status === 'accepted') {
-            // In public view we might not have full user details joined easily unless getPublicTrip includes it
-            // Let's assume invite has minimal info or we treat them as guests if user not expanded
-            // Ideally getPublicTrip should expand user for accepted invites. 
-            // Checking getPublicTrip... usually it might not fetch deeply.
-            // But for now let's just show them as "Member"
-            memberUsers.push({
-                id: "guest-" + invite.id,
-                name: invite.email.split('@')[0],
-                email: invite.email,
-                image: invite.guestAvatar,
-                isGuest: true
-            });
-        }
-    });
 
     return (
         <div className="min-h-screen bg-background pb-20">
@@ -116,21 +93,20 @@ export default async function PublicTripPage(props: PublicTripPageProps) {
                     <div className="flex items-center gap-4">
                         <div className="flex -space-x-3 transition-all">
                             <TooltipProvider>
-                                {/* Creator */}
-                                <Tooltip>
-                                    <TooltipTrigger>
-                                        <div className="relative h-10 w-10">
-                                            <div className="h-full w-full rounded-full border-2 border-green-500 bg-muted overflow-hidden">
-                                                <NotionAvatar config={getAvatarConfig(trip.user.avatar)} className="h-full w-full" />
+                                {members.map((member, i) => (
+                                    <Tooltip key={member.id || i}>
+                                        <TooltipTrigger>
+                                            <div className={cn("relative h-10 w-10 overflow-hidden rounded-full border-2 border-background", i === 0 && "border-green-500 z-10")}>
+                                                <div className="h-full w-full bg-muted">
+                                                    <NotionAvatar config={getAvatarConfig(member.avatar || member.image)} className="h-full w-full" />
+                                                </div>
                                             </div>
-                                        </div>
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                        <p>{trip.user.name || 'Creator'} (Creator)</p>
-                                    </TooltipContent>
-                                </Tooltip>
-
-                                {/* We can show other members if needed, but for public share usually just creator is key or simplified list */}
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                            <p>{member.name || member.email?.split('@')[0] || 'Member'} {i === 0 ? '(Creator)' : ''}</p>
+                                        </TooltipContent>
+                                    </Tooltip>
+                                ))}
                             </TooltipProvider>
                         </div>
                     </div>
@@ -153,8 +129,8 @@ export default async function PublicTripPage(props: PublicTripPageProps) {
                         <ItineraryTimeline
                             items={trip.itineraries}
                             tripId={trip.id}
-                            members={memberUsers}
-                            currentUser={memberUsers[0]}
+                            members={members}
+                            currentUser={members[0]}
                             startDate={trip.startDate}
                             endDate={trip.endDate}
                             readOnly={true}
@@ -169,7 +145,7 @@ export default async function PublicTripPage(props: PublicTripPageProps) {
                         </div>
                         <TripExpenses
                             transactions={trip.tripTransactions || []}
-                            members={memberUsers}
+                            members={members}
                             currency={'USD'} // Default for public view since we don't know viewer's pref
                         />
                     </section>
