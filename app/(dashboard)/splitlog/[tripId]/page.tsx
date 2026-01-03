@@ -1,17 +1,17 @@
 import { notFound } from 'next/navigation';
 import { getTrip } from '@/actions/trips';
-import { MapPin, Plus, ArrowLeft } from 'lucide-react';
+import { MapPin, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { BackgroundSelectorWrapper } from '@/components/trips/background-selector-wrapper';
 import { EditableTitle } from '@/components/trips/editable-title';
 import { EditableDateRange } from '@/components/trips/editable-date-range';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { NotionAvatar } from '@/components/avatars/notion-avatar';
 import { AvatarConfig } from '@/components/avatars/notion-avatar/types';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { TripNotes } from '@/components/trips/trip-notes';
 import { ItineraryTimeline } from '@/components/trips/itinerary-timeline';
+import { TripExpenses } from '@/components/trips/trip-expenses';
 import { ShareTripDialog } from '@/components/trips/share-trip-dialog';
 import { InviteMemberDialog } from '@/components/trips/invite-member-dialog';
 import { MemberAvatarAction } from '@/components/trips/member-avatar-action';
@@ -283,13 +283,12 @@ export default async function TripDetailsPage(props: TripDetailsPageProps) {
                     <section id="expenses" className="space-y-6">
                         <div className="flex items-center justify-between">
                             <h2 className="text-xl font-semibold">Trip Expenses</h2>
-                            <Button size="sm">
-                                <Plus className="h-4 w-4 mr-1" /> Add Expense
-                            </Button>
                         </div>
-                        <div className="text-center py-12 border border-dashed rounded-lg bg-muted/20">
-                            <p className="text-muted-foreground">No expenses recorded for this trip.</p>
-                        </div>
+                        <TripExpenses
+                            transactions={trip.tripTransactions}
+                            members={memberUsers}
+                            currency={(currentUser as any).currency || 'USD'}
+                        />
                     </section>
                 </div>
             </div>

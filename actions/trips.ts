@@ -340,6 +340,29 @@ export async function getTrip(tripId: string) {
                     },
                 }
             },
+            // Fetch all transactions for expense calculations
+            tripTransactions: {
+                where: (utils, { eq }) => eq(utils.isDeleted, false),
+                orderBy: (transactions, { desc }) => [desc(transactions.date)],
+                with: {
+                    paidByUser: true,
+                    paidByGuest: true,
+                    category: true,
+                    splits: {
+                        with: {
+                            user: true,
+                            guest: true
+                        }
+                    },
+                    payers: {
+                        with: {
+                            user: true,
+                            guest: true
+                        }
+                    },
+                    user: true
+                }
+            },
             // Include invites
             invites: true,
         },
