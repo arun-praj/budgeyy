@@ -479,9 +479,62 @@ export async function archiveTrip(tripId: string) {
         })
         .where(eq(trips.id, tripId));
 
-    revalidatePath('/splitlog');
     revalidatePath(`/splitlog/${tripId}`);
     return { success: true };
+}
+
+export async function unarchiveTrip(tripId: string) {
+    const session = await auth.api.getSession({
+        headers: await headers()
+    });
+
+    if (!session?.user) {
+        throw new Error('Unauthorized');
+    }
+
+    const trip = await db.query.trips.findFirst({
+        where: eq(trips.id, tripId),
+    });
+
+    if (!trip) {
+        throw new Error('Trip not found');
+    }
+
+    if (trip.userId !== session.user.id) {
+        throw new Error('Only the trip creator can unarchive the trip');
+    }
+
+    await db.update(trips)
+        .set({
+            isArchived: false,
+            updatedAt: new Date()
+        })
+        .where(eq(trips.id, tripId));
+
+    revalidatePath('/splitlog');
+    // also revalidate profile/settings where this list might be shown
+    revalidatePath('/settings');
+    return { success: true };
+}
+
+export async function getArchivedTrips() {
+    const session = await auth.api.getSession({
+        headers: await headers()
+    });
+
+    if (!session?.user) {
+        return [];
+    }
+
+    const archivedTrips = await db.query.trips.findMany({
+        where: and(
+            eq(trips.userId, session.user.id),
+            eq(trips.isArchived, true)
+        ),
+        orderBy: [desc(trips.archivedAt)],
+    });
+
+    return archivedTrips;
 }
 
 export async function updateItineraryDay(itineraryId: string, data: { title?: string; location?: string }) {

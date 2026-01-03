@@ -31,10 +31,17 @@ interface TripDetailsPageProps {
 
 export default async function TripDetailsPage(props: TripDetailsPageProps) {
     const params = await props.params;
+
+    // Sanitize tripId: extraction might include sticking params if ? is missing (common with some email clients)
+    // e.g. "uuid&source=gmail"
+    let tripId = params.tripId;
+    if (tripId.includes('&')) tripId = tripId.split('&')[0];
+    if (tripId.includes('%26')) tripId = tripId.split('%26')[0];
+
     const session = await auth.api.getSession({
         headers: await headers()
     });
-    const trip = await getTrip(params.tripId);
+    const trip = await getTrip(tripId);
 
     // Fetch full user to get currency preference (session might be stale or partial)
     let currentUser = session?.user;

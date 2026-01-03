@@ -54,10 +54,15 @@ export default function SettingsPage() {
     );
 }
 
+import { ArchivedTripsList } from '@/components/settings/archived-trips-list';
+import { getArchivedTrips } from '@/actions/trips';
+import { ArchiveRestore } from 'lucide-react';
+
 async function SettingsContent() {
-    const [user, deletedTransactions] = await Promise.all([
+    const [user, deletedTransactions, archivedTrips] = await Promise.all([
         getUserSettings(),
-        getDeletedTransactions()
+        getDeletedTransactions(),
+        getArchivedTrips()
     ]);
 
     if (!user) {
@@ -66,10 +71,11 @@ async function SettingsContent() {
 
     return (
         <Tabs defaultValue="general" className="space-y-4">
-            <TabsList className="grid w-full grid-cols-3 lg:w-[400px]">
+            <TabsList className="grid w-full grid-cols-4 lg:w-[500px]">
                 <TabsTrigger value="general">General</TabsTrigger>
                 <TabsTrigger value="account">Account</TabsTrigger>
                 <TabsTrigger value="deleted">Trash</TabsTrigger>
+                <TabsTrigger value="archived">Archived</TabsTrigger>
             </TabsList>
 
             <TabsContent value="general" className="space-y-4">
@@ -113,6 +119,10 @@ async function SettingsContent() {
                         />
                     </CardContent>
                 </Card>
+            </TabsContent>
+
+            <TabsContent value="archived" className="space-y-4">
+                <ArchivedTripsList initialTrips={archivedTrips} />
             </TabsContent>
         </Tabs>
     );
