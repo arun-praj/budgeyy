@@ -199,6 +199,40 @@ export async function updateTripNotes(tripId: string, notes: string) {
     revalidatePath(`/splitlog/${tripId}`);
 }
 
+export async function updateTripDescription(tripId: string, description: string) {
+    const session = await auth.api.getSession({
+        headers: await headers(),
+    });
+
+    if (!session) {
+        throw new Error('Unauthorized');
+    }
+
+    const trip = await db.query.trips.findFirst({
+        where: eq(trips.id, tripId),
+        with: {
+            invites: true
+        }
+    });
+
+    if (!trip) {
+        throw new Error('Trip not found');
+    }
+
+    const isCreator = trip.userId === session.user.id;
+    const isInvited = trip.invites.some(invite => invite.email === session.user.email);
+
+    if (!isCreator && !isInvited) {
+        throw new Error('Unauthorized');
+    }
+
+    await db.update(trips)
+        .set({ description, updatedAt: new Date() })
+        .where(eq(trips.id, tripId));
+
+    revalidatePath(`/splitlog/${tripId}`);
+}
+
 export async function deleteItineraryDay(itineraryId: string) {
     const session = await auth.api.getSession({
         headers: await headers()

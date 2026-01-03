@@ -7,8 +7,6 @@ import { EditableTitle } from '@/components/trips/editable-title';
 import { EditableDateRange } from '@/components/trips/editable-date-range';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { NotionAvatar } from '@/components/avatars/notion-avatar';
 import { AvatarConfig } from '@/components/avatars/notion-avatar/types';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -259,58 +257,40 @@ export default async function TripDetailsPage(props: TripDetailsPageProps) {
                 </div>
 
                 {/* 2. Information Page Below */}
-                <div className="mt-8">
-                    <Tabs defaultValue="itinerary" className="w-full">
-                        <TabsList className="grid w-full grid-cols-3 max-w-md mb-8">
-                            <TabsTrigger value="overview">Overview</TabsTrigger>
-                            <TabsTrigger value="itinerary">Itinerary</TabsTrigger>
-                            <TabsTrigger value="expenses">Expenses</TabsTrigger>
-                        </TabsList>
+                <div className="mt-8 space-y-12">
+                    {/* 1. Overview Section */}
+                    <section id="overview">
+                        <TripNotes tripId={trip.id} initialNotes={trip.notes} />
+                    </section>
 
-                        <TabsContent value="overview" className="space-y-6">
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle>Trip Details</CardTitle>
-                                </CardHeader>
-                                <CardContent className="space-y-4">
-                                    <div>
-                                        <h3 className="font-medium text-muted-foreground mb-1">Description</h3>
-                                        <p>{trip.description || 'No description added.'}</p>
-                                    </div>
-                                    <div className="pt-4 border-t">
-                                        <TripNotes tripId={trip.id} initialNotes={trip.notes} />
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        </TabsContent>
+                    {/* 2. Itinerary Section */}
+                    <section id="itinerary" className="space-y-6">
+                        <div className="flex items-center justify-between">
+                            <h2 className="text-xl font-semibold">Itinerary</h2>
+                        </div>
 
-                        <TabsContent value="itinerary" className="space-y-6">
-                            <div className="flex items-center justify-between">
-                                <h2 className="text-xl font-semibold">Itinerary</h2>
-                            </div>
+                        <ItineraryTimeline
+                            items={trip.itineraries}
+                            tripId={trip.id}
+                            members={memberUsers}
+                            currentUser={currentUser}
+                            startDate={trip.startDate}
+                            endDate={trip.endDate}
+                        />
+                    </section>
 
-                            <ItineraryTimeline
-                                items={trip.itineraries}
-                                tripId={trip.id}
-                                members={memberUsers}
-                                currentUser={currentUser}
-                                startDate={trip.startDate}
-                                endDate={trip.endDate}
-                            />
-                        </TabsContent>
-
-                        <TabsContent value="expenses">
-                            <div className="flex items-center justify-between mb-6">
-                                <h2 className="text-xl font-semibold">Trip Expenses</h2>
-                                <Button size="sm">
-                                    <Plus className="h-4 w-4 mr-1" /> Add Expense
-                                </Button>
-                            </div>
-                            <div className="text-center py-12 border border-dashed rounded-lg bg-muted/20">
-                                <p className="text-muted-foreground">No expenses recorded for this trip.</p>
-                            </div>
-                        </TabsContent>
-                    </Tabs>
+                    {/* 3. Expenses Section */}
+                    <section id="expenses" className="space-y-6">
+                        <div className="flex items-center justify-between">
+                            <h2 className="text-xl font-semibold">Trip Expenses</h2>
+                            <Button size="sm">
+                                <Plus className="h-4 w-4 mr-1" /> Add Expense
+                            </Button>
+                        </div>
+                        <div className="text-center py-12 border border-dashed rounded-lg bg-muted/20">
+                            <p className="text-muted-foreground">No expenses recorded for this trip.</p>
+                        </div>
+                    </section>
                 </div>
             </div>
         </div>
