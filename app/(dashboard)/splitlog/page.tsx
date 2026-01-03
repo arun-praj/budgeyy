@@ -75,7 +75,13 @@ async function TripsContent() {
                                     </div>
                                 )}
                                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-                                <div className="absolute top-4 right-4 z-20 flex gap-2">
+                                <div
+                                    className="absolute top-4 right-4 z-20 flex gap-2"
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                    }}
+                                >
                                     {trip.userId === session?.user?.id && (
                                         <>
                                             <ShareTripDialog

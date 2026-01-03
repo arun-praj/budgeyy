@@ -1257,6 +1257,26 @@ export async function getPublicTrip(shareId: string) {
                         }
                     }
                 }
+            },
+            // Add invites to display members
+            invites: true,
+            // Add tripTransactions for expenses view
+            tripTransactions: {
+                where: (utils, { eq }) => eq(utils.isDeleted, false),
+                with: {
+                    paidByUser: true,
+                    category: true,
+                    splits: {
+                        with: {
+                            user: true
+                        }
+                    },
+                    payers: {
+                        with: {
+                            user: true
+                        }
+                    }
+                }
             }
         }
     });
