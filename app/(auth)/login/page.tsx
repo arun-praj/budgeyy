@@ -20,7 +20,7 @@ import {
     FormMessage,
 } from '@/components/ui/form';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { signIn } from '@/lib/auth-client';
+import { signIn, authClient } from '@/lib/auth-client';
 
 const loginSchema = z.object({
     email: z.string().email('Please enter a valid email address'),
@@ -61,7 +61,16 @@ function LoginContent() {
             });
 
             if (result.error) {
-                setError(result.error.message || 'Invalid credentials');
+                if (result.error.status === 403 || result.error.message?.toLowerCase().includes('verify')) {
+                    // Pre-emptively trigger OTP send
+                    await authClient.emailOtp.sendVerificationOtp({
+                        email: data.email,
+                        type: 'email-verification',
+                    });
+                    router.push(`/verify-email?email=${encodeURIComponent(data.email)}`);
+                } else {
+                    setError(result.error.message || 'Invalid credentials');
+                }
             } else {
                 router.push('/dashboard');
                 router.refresh();

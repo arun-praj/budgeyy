@@ -71,7 +71,7 @@ function RegisterContent() {
             if (result.error) {
                 setError(result.error.message || 'Registration failed');
             } else {
-                router.push('/onboarding');
+                router.push(`/verify-email?email=${encodeURIComponent(data.email)}`);
                 router.refresh();
             }
         } catch {
