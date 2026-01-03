@@ -327,6 +327,69 @@ export async function getTrip(tripId: string) {
     return trip;
 }
 
+export async function deleteTrip(tripId: string) {
+    const session = await auth.api.getSession({
+        headers: await headers()
+    });
+
+    if (!session?.user) {
+        throw new Error('Unauthorized');
+    }
+
+    // 1. Verify trip exists and user is creator
+    const trip = await db.query.trips.findFirst({
+        where: eq(trips.id, tripId),
+    });
+
+    if (!trip) {
+        throw new Error('Trip not found');
+    }
+
+    if (trip.userId !== session.user.id) {
+        throw new Error('Only the trip creator can delete the trip');
+    }
+
+    // 2. Perform deletion
+    // Depending on schema, we might need explicit cascading
+    // Let's be explicit for safety as seen in updateTripDates
+    await db.transaction(async (tx) => {
+        // Get all itinerary IDs for this trip
+        const itineraries = await tx.query.tripItineraries.findMany({
+            where: eq(schema.tripItineraries.tripId, tripId),
+            columns: { id: true }
+        });
+        const itineraryIds = itineraries.map(i => i.id);
+
+        if (itineraryIds.length > 0) {
+            // Delete related records for itineraries
+            await tx.delete(schema.itineraryNotes)
+                .where(inArray(schema.itineraryNotes.tripItineraryId, itineraryIds));
+            await tx.delete(schema.itineraryChecklists)
+                .where(inArray(schema.itineraryChecklists.tripItineraryId, itineraryIds));
+            // Multi-user expenses handles deletions via isDeleted usually, 
+            // but for a full trip delete we can wipe them or set isDeleted.
+            // Let's be consistent and delete them if we are wiping the trip.
+            await tx.delete(schema.tripTransactions)
+                .where(inArray(schema.tripTransactions.tripItineraryId, itineraryIds));
+        }
+
+        // Delete invites
+        await tx.delete(schema.tripInvites)
+            .where(eq(schema.tripInvites.tripId, tripId));
+
+        // Delete itineraries
+        await tx.delete(schema.tripItineraries)
+            .where(eq(schema.tripItineraries.tripId, tripId));
+
+        // Delete trip itself
+        await tx.delete(trips)
+            .where(eq(trips.id, tripId));
+    });
+
+    revalidatePath('/splitlog');
+    return { success: true };
+}
+
 export async function updateItineraryDay(itineraryId: string, data: { title?: string; location?: string }) {
     const session = await auth.api.getSession({
         headers: await headers()
