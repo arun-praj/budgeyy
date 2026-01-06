@@ -6,6 +6,7 @@ import { emailOTP } from 'better-auth/plugins';
 import { sendEmail, emailTemplates } from './mail';
 
 export const auth = betterAuth({
+    baseURL: process.env.BETTER_AUTH_URL || `http://127.0.0.1:${process.env.PORT || 3000}`,
     database: drizzleAdapter(db, {
         provider: 'pg',
         // Map better-auth's expected names to our actual table schemas
