@@ -80,7 +80,9 @@ export const auth = betterAuth({
         },
     },
     trustedOrigins: [
-        process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000', 'http://192.168.1.73:3000',
+        process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
+        'http://192.168.1.73:3000',
+        ...(process.env.TRUSTED_ORIGINS ? process.env.TRUSTED_ORIGINS.split(',') : []),
     ],
 });
 

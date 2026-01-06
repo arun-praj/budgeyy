@@ -22,9 +22,17 @@ export async function middleware(request: NextRequest) {
     let session: any = null;
 
     try {
-        const response = await fetch(new URL('/api/auth/get-session', request.url), {
+        const url = request.url;
+        const PORT = process.env.PORT || 3000;
+        const baseUrl = process.env.BETTER_AUTH_URL || `http://127.0.0.1:${PORT}`;
+        const sessionUrl = new URL('/api/auth/get-session', baseUrl);
+
+        const response = await fetch(sessionUrl, {
             headers: {
+                // Pass the original cookie
                 cookie: request.headers.get('cookie') || '',
+                // Pass the original host header so the server knows the real domain
+                host: request.headers.get('host') || '',
             },
         });
 
