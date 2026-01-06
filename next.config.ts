@@ -5,7 +5,7 @@ const nextConfig: NextConfig = {
   /* config options here */
   allowedDevOrigins: ['http://localhost:3000', 'http://192.168.1.91:3000', '192.168.1.91'],
   // cacheComponents: true, // Disabled to fix dynamic route build issue
-  serverExternalPackages: ["sharp"],
+  serverExternalPackages: ["sharp", "postgres", "drizzle-orm"],
   experimental: {
     serverActions: {
       bodySizeLimit: '5mb',
