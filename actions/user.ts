@@ -1,7 +1,7 @@
 'use server';
 
 import { db } from '@/db';
-import { users, userSurveys } from '@/db/schema';
+import { users, userSurveys, accounts } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 import { auth } from '@/lib/auth';
 import { headers } from 'next/headers';
@@ -267,4 +267,24 @@ export async function reactivateAccount() {
         console.error('Failed to reactivate account:', error);
         return { error: 'Failed to reactivate account' };
     }
+}
+
+export async function getConnectedAccounts() {
+    const session = await auth.api.getSession({
+        headers: await headers(),
+    });
+
+    if (!session?.user?.id) {
+        return [];
+    }
+
+    const connected = await db.query.accounts.findMany({
+        where: eq(accounts.userId, session.user.id),
+        columns: {
+            providerId: true,
+            createdAt: true,
+        },
+    });
+
+    return connected;
 }

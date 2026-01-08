@@ -21,6 +21,13 @@ export const auth = betterAuth({
         enabled: true,
         requireEmailVerification: false,
     },
+    socialProviders: {
+        google: {
+            clientId: process.env.GOOGLE_CLIENT_ID as string,
+            clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
+            scope: ['https://www.googleapis.com/auth/gmail.readonly', 'openid', 'profile', 'email'],
+        },
+    },
     plugins: [
         emailOTP({
             async sendVerificationOTP({ email, otp }) {

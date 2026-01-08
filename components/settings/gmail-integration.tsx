@@ -1,0 +1,129 @@
+'use client';
+
+import { useState } from 'react';
+import { Button } from "@/components/ui/button";
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from "@/components/ui/card";
+import { Mail, RefreshCw, CheckCircle, AlertCircle, Loader2 } from "lucide-react";
+import { authClient } from "@/lib/auth-client";
+import { TransactionalEmailsList } from './transactional-emails-list';
+import { syncGmail } from '@/actions/gmail-sync';
+import { toast } from "sonner";
+import { useRouter } from 'next/navigation';
+
+interface GmailIntegrationProps {
+    isConnected: boolean;
+    initialEmails: any[];
+}
+
+export function GmailIntegration({ isConnected, initialEmails }: GmailIntegrationProps) {
+    const [isSyncing, setIsSyncing] = useState(false);
+    const router = useRouter();
+
+    const handleConnect = async () => {
+        await authClient.linkSocial({
+            provider: "google",
+            callbackURL: "/settings", // Redirect back to settings
+        });
+    };
+
+    const handleSync = async () => {
+        setIsSyncing(true);
+        try {
+            const result = await syncGmail();
+            if (result.success) {
+                toast.success(`Synced ${result.syncedCount} new emails!`);
+                router.refresh(); // Refresh to show new emails
+            } else {
+                toast.error(result.error || 'Failed to sync');
+            }
+        } catch (error) {
+            toast.error('An error occurred during sync');
+        } finally {
+            setIsSyncing(false);
+        }
+    };
+
+    return (
+        <div className="space-y-6">
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                        <Mail className="h-5 w-5" />
+                        Gmail Integration
+                    </CardTitle>
+                    <CardDescription>
+                        Connect your Gmail account to automatically scan for transactional emails (receipts, invoices) using AI.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div className="flex items-center justify-between p-4 border rounded-lg bg-card">
+                        <div className="flex items-center gap-4">
+                            <div className="h-10 w-10 rounded-full bg-red-100 flex items-center justify-center">
+                                <Mail className="h-5 w-5 text-red-600" />
+                            </div>
+                            <div>
+                                <h4 className="font-medium">Google Account</h4>
+                                <p className="text-sm text-muted-foreground">
+                                    {isConnected ? 'Connected' : 'Not connected'}
+                                </p>
+                            </div>
+                        </div>
+                        {isConnected ? (
+                            <div className="flex items-center gap-2">
+                                <Button
+                                    onClick={handleSync}
+                                    disabled={isSyncing}
+                                    variant="outline"
+                                >
+                                    {isSyncing ? (
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    ) : (
+                                        <RefreshCw className="mr-2 h-4 w-4" />
+                                    )}
+                                    Sync Now
+                                </Button>
+                                <Button variant="ghost" size="icon" className="text-green-600 hover:text-green-700 pointer-events-none">
+                                    <CheckCircle className="h-5 w-5" />
+                                </Button>
+                            </div>
+                        ) : (
+                            <Button onClick={handleConnect}>
+                                Connect Gmail
+                            </Button>
+                        )}
+                    </div>
+
+                    {!isConnected && (
+                        <div className="bg-muted/50 p-4 rounded-lg text-sm text-muted-foreground flex gap-2 items-start">
+                            <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+                            <p>
+                                Connecting will grant read-only access to your emails. We use Gemini AI to strictly process metadata
+                                and identify financial transactions. Your emails are not stored; only extracted transaction details are saved.
+                            </p>
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
+
+            {isConnected && (
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Recent Synced Emails</CardTitle>
+                        <CardDescription>
+                            Transactional emails identified by AI.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <TransactionalEmailsList emails={initialEmails} />
+                    </CardContent>
+                </Card>
+            )}
+        </div>
+    );
+}

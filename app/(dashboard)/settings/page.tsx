@@ -56,24 +56,32 @@ export default function SettingsPage() {
 
 import { ArchivedTripsList } from '@/components/settings/archived-trips-list';
 import { getArchivedTrips } from '@/actions/trips';
-import { ArchiveRestore } from 'lucide-react';
+import { ArchiveRestore, Plus, Mail } from 'lucide-react';
+import { getConnectedAccounts } from '@/actions/user';
+import { getRecentTransactionalEmails } from '@/actions/gmail-sync';
+import { GmailIntegration } from '@/components/settings/gmail-integration';
 
 async function SettingsContent() {
-    const [user, deletedTransactions, archivedTrips] = await Promise.all([
+    const [user, deletedTransactions, archivedTrips, connectedAccounts, recentEmails] = await Promise.all([
         getUserSettings(),
         getDeletedTransactions(),
-        getArchivedTrips()
+        getArchivedTrips(),
+        getConnectedAccounts(),
+        getRecentTransactionalEmails(),
     ]);
 
     if (!user) {
         redirect('/login');
     }
 
+    const isGoogleConnected = connectedAccounts.some(acc => acc.providerId === 'google');
+
     return (
         <Tabs defaultValue="general" className="space-y-4">
-            <TabsList className="grid w-full grid-cols-4 lg:w-[500px]">
+            <TabsList className="grid w-full grid-cols-5 lg:w-[600px]">
                 <TabsTrigger value="general">General</TabsTrigger>
                 <TabsTrigger value="account">Account</TabsTrigger>
+                <TabsTrigger value="integrations">Integrations</TabsTrigger>
                 <TabsTrigger value="deleted">Trash</TabsTrigger>
                 <TabsTrigger value="archived">Archived</TabsTrigger>
             </TabsList>
@@ -99,6 +107,13 @@ async function SettingsContent() {
                 <DataExport />
                 <DataImport />
                 <AccountActions />
+            </TabsContent>
+
+            <TabsContent value="integrations" className="space-y-4">
+                <GmailIntegration
+                    isConnected={isGoogleConnected}
+                    initialEmails={recentEmails}
+                />
             </TabsContent>
 
             <TabsContent value="deleted" className="space-y-4">

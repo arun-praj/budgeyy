@@ -14,4 +14,5 @@ export const {
     signOut,
     useSession,
     getSession,
+    linkSocial,
 } = authClient;

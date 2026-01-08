@@ -417,12 +417,27 @@ export const tripTransactionPayersRelations = relations(tripTransactionPayers, (
 }));
 
 
-export type Transaction = typeof transactions.$inferSelect;
-export type Category = typeof categories.$inferSelect;
-export type User = typeof users.$inferSelect;
-export type Trip = typeof trips.$inferSelect;
-export type TripItinerary = typeof tripItineraries.$inferSelect;
-export type TripTransaction = typeof tripTransactions.$inferSelect;
-export type TripTransactionSplit = typeof tripTransactionSplits.$inferSelect;
-export type TripTransactionPayer = typeof tripTransactionPayers.$inferSelect;
-export type Budget = typeof budgets.$inferSelect;
+// Transactional Emails Table
+export const transactionalEmails = pgTable('transactional_emails', {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    emailId: text('email_id').notNull().unique(), // Gmail message ID
+    sender: text('sender').notNull(),
+    subject: text('subject').notNull(),
+    amount: decimal('amount', { precision: 12, scale: 2 }),
+    currency: text('currency').default('USD'),
+    date: timestamp('date').notNull(),
+    category: text('category'),
+    summary: text('summary'),
+    // rawContent: text('raw_content'), // Optional: keep for debugging if needed, maybe truncate?
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
+export const transactionalEmailsRelations = relations(transactionalEmails, ({ one }) => ({
+    user: one(users, {
+        fields: [transactionalEmails.userId],
+        references: [users.id],
+    }),
+}));
+
