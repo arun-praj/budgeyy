@@ -17,13 +17,17 @@ import { toast } from "sonner";
 import { useRouter } from 'next/navigation';
 
 interface GmailIntegrationProps {
-    isConnected: boolean;
+    accountStatus: {
+        isConnected: boolean;
+        hasRefreshToken: boolean;
+    };
     initialEmails: any[];
 }
 
-export function GmailIntegration({ isConnected, initialEmails }: GmailIntegrationProps) {
+export function GmailIntegration({ accountStatus, initialEmails }: GmailIntegrationProps) {
     const [isSyncing, setIsSyncing] = useState(false);
     const router = useRouter();
+    const { isConnected, hasRefreshToken } = accountStatus;
 
     const handleConnect = async () => {
         await authClient.linkSocial({
@@ -68,13 +72,23 @@ export function GmailIntegration({ isConnected, initialEmails }: GmailIntegratio
                                 <Mail className="h-5 w-5 text-red-600" />
                             </div>
                             <div>
-                                <h4 className="font-medium">Google Account</h4>
+                                <div className="flex items-center gap-2">
+                                    <h4 className="font-medium">Google Account</h4>
+                                    {isConnected && !hasRefreshToken && (
+                                        <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-full flex items-center gap-1">
+                                            <AlertCircle className="h-3 w-3" />
+                                            Reconnect Required
+                                        </span>
+                                    )}
+                                </div>
                                 <p className="text-sm text-muted-foreground">
-                                    {isConnected ? 'Connected' : 'Not connected'}
+                                    {isConnected
+                                        ? (hasRefreshToken ? 'Connected & Ready' : 'Connection Expired')
+                                        : 'Not connected'}
                                 </p>
                             </div>
                         </div>
-                        {isConnected ? (
+                        {isConnected && hasRefreshToken ? (
                             <div className="flex items-center gap-2">
                                 <Button
                                     onClick={handleSync}
@@ -93,8 +107,8 @@ export function GmailIntegration({ isConnected, initialEmails }: GmailIntegratio
                                 </Button>
                             </div>
                         ) : (
-                            <Button onClick={handleConnect}>
-                                Connect Gmail
+                            <Button onClick={handleConnect} variant={isConnected ? "default" : "outline"}>
+                                {isConnected ? 'Reconnect Gmail' : 'Connect Gmail'}
                             </Button>
                         )}
                     </div>

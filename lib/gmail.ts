@@ -1,12 +1,35 @@
 import { google } from 'googleapis';
 
-export const getGmailClient = (accessToken: string) => {
-    const auth = new google.auth.OAuth2();
-    auth.setCredentials({ access_token: accessToken });
+export const getGmailClient = (accessToken: string, refreshToken?: string) => {
+    const auth = new google.auth.OAuth2(
+        process.env.GOOGLE_CLIENT_ID,
+        process.env.GOOGLE_CLIENT_SECRET
+    );
+    auth.setCredentials({
+        access_token: accessToken,
+        refresh_token: refreshToken
+    });
     return google.gmail({ version: 'v1', auth });
 };
 
+export async function refreshAccessToken(refreshToken: string) {
+    const auth = new google.auth.OAuth2(
+        process.env.GOOGLE_CLIENT_ID,
+        process.env.GOOGLE_CLIENT_SECRET
+    );
+    auth.setCredentials({ refresh_token: refreshToken });
+
+    const { credentials } = await auth.refreshAccessToken();
+    return {
+        accessToken: credentials.access_token,
+        expiryDate: credentials.expiry_date,
+        refreshToken: credentials.refresh_token // Sometimes it rotates
+    };
+}
+
 export async function fetchRecentEmails(accessToken: string, maxResults = 20) {
+    // Note: If calling this independently, ensure accessToken is valid.
+    // Use the sync action wrapper to handle refresh.
     const gmail = getGmailClient(accessToken);
 
     try {

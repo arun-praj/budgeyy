@@ -19,6 +19,7 @@ import {
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/layout/theme-toggle';
+import { NotificationBell } from '@/components/layout/notification-bell';
 
 const navItems = [
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -56,11 +57,16 @@ export function Sidebar({ avatarConfig: initialAvatarConfig }: SidebarProps) {
     const SidebarContent = () => (
         <div className="flex h-full flex-col">
             {/* Logo */}
-            <div className="flex h-16 items-center gap-2 border-b px-4">
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
-                    <Wallet className="h-5 w-5 text-primary-foreground" />
+            <div className="flex h-16 items-center justify-between border-b px-4">
+                <div className="flex items-center gap-2">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
+                        <Wallet className="h-5 w-5 text-primary-foreground" />
+                    </div>
+                    <span className="font-bold text-xl">Budgeyy</span>
                 </div>
-                <span className="font-bold text-xl">Budgeyy</span>
+                <div className="flex items-center">
+                    <NotificationBell />
+                </div>
             </div>
 
             {/* Navigation */}

@@ -26,6 +26,8 @@ export const auth = betterAuth({
             clientId: process.env.GOOGLE_CLIENT_ID as string,
             clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
             scope: ['https://www.googleapis.com/auth/gmail.readonly', 'openid', 'profile', 'email'],
+            accessType: 'offline',
+            prompt: 'select_account consent',
         },
     },
     plugins: [

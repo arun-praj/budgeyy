@@ -74,7 +74,11 @@ async function SettingsContent() {
         redirect('/login');
     }
 
-    const isGoogleConnected = connectedAccounts.some(acc => acc.providerId === 'google');
+    const googleAccount = connectedAccounts.find(acc => acc.providerId === 'google');
+    const accountStatus = {
+        isConnected: !!googleAccount,
+        hasRefreshToken: !!googleAccount?.hasRefreshToken,
+    };
 
     return (
         <Tabs defaultValue="general" className="space-y-4">
@@ -111,7 +115,7 @@ async function SettingsContent() {
 
             <TabsContent value="integrations" className="space-y-4">
                 <GmailIntegration
-                    isConnected={isGoogleConnected}
+                    accountStatus={accountStatus}
                     initialEmails={recentEmails}
                 />
             </TabsContent>

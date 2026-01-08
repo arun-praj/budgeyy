@@ -23,8 +23,95 @@ export async function performGmailSync(userId: string) {
         throw new Error('Google account not connected or missing access token');
     }
 
-    // TODO: Handle token refresh if expired (check account.expiresAt)
-    const emails = await fetchRecentEmails(account.accessToken, 4);
+    console.log('DEBUG: Account found:', {
+        hasAccessToken: !!account.accessToken,
+        accessTokenLength: account.accessToken?.length,
+        hasRefreshToken: !!account.refreshToken,
+        refreshTokenLength: account.refreshToken?.length,
+        expiresAt: account.accessTokenExpiresAt,
+        provider: account.providerId
+    });
+
+    // Helper to refresh token
+    const refreshAndSaveToken = async (refreshToken: string) => {
+        console.log('Refreshing expired/invalid access token...');
+        const { refreshAccessToken } = await import('@/lib/gmail'); // Dynamic import to avoid cycles if any
+        const newTokens = await refreshAccessToken(refreshToken);
+
+        if (!newTokens.accessToken) throw new Error('Failed to retrieve new access token');
+
+        // Update DB
+        await db.update(accounts)
+            .set({
+                accessToken: newTokens.accessToken,
+                accessTokenExpiresAt: newTokens.expiryDate ? new Date(newTokens.expiryDate) : undefined,
+                refreshToken: newTokens.refreshToken || refreshToken, // Update if rotated
+                updatedAt: new Date(),
+            })
+            .where(and(
+                eq(accounts.userId, userId),
+                eq(accounts.providerId, 'google')
+            ));
+
+        console.log('Token refreshed successfully.');
+        return newTokens.accessToken;
+    };
+
+    let currentAccessToken = account.accessToken;
+    let emails: any[] = [];
+
+    // 1. Check time-based expiry first (optimization)
+    const now = new Date();
+    const expiry = account.accessTokenExpiresAt;
+    const isTimeExpired = !expiry || now.getTime() > (expiry.getTime() - 5 * 60 * 1000);
+
+    if (isTimeExpired && account.refreshToken) {
+        try {
+            currentAccessToken = await refreshAndSaveToken(account.refreshToken);
+        } catch (e) {
+            console.error('Time-based refresh failed:', e);
+            // Verify if we can continue? Probably not, but let's try the old token or fail.
+            // Throwing here is safer.
+            throw new Error('Failed to refresh expired token.');
+        }
+    }
+
+    // 3. Explicit Re-login Check (User Request)
+    if (!currentAccessToken && !account.refreshToken) {
+        throw new Error('No valid tokens found. Please reconnect Gmail in Settings.');
+    }
+
+    // 2. Try Fetching - with 401 Retry
+    try {
+        if (!currentAccessToken) throw new Error('Missing access token'); // Should be caught by refresh logic usually
+        emails = await fetchRecentEmails(currentAccessToken, 4);
+    } catch (error: any) {
+        // Check for 401 or "invalid authentication credentials"
+        const isAuthError =
+            error.code === 401 ||
+            (error?.message && error.message.includes('invalid authentication credentials'));
+
+        if (isAuthError) {
+            console.log('Encountered 401 Invalid Credentials.');
+
+            if (!account.refreshToken) {
+                throw new Error('Session expired and no recovery token available. Please reconnect Gmail in Settings.');
+            }
+
+            console.log('Attempting recovery refresh...');
+            try {
+                // Force refresh
+                const freshAccessToken = await refreshAndSaveToken(account.refreshToken);
+                // Retry fetch with new token
+                emails = await fetchRecentEmails(freshAccessToken, 4);
+            } catch (retryError) {
+                console.error('Retry after refresh failed:', retryError);
+                throw new Error('Gmail session expired. Please reconnect your account in Settings.');
+            }
+        } else {
+            throw error; // Re-throw non-auth errors
+        }
+    }
 
     let syncedCount = 0;
 
@@ -40,9 +127,10 @@ export async function performGmailSync(userId: string) {
         if (existing) continue;
 
         // Extract metadata
+        // Extract metadata
         const headers = email.payload?.headers || [];
-        const subject = headers.find((h) => h.name === 'Subject')?.value || 'No Subject';
-        const sender = headers.find((h) => h.name === 'From')?.value || 'Unknown Sender';
+        const subject = headers.find((h: any) => h.name === 'Subject')?.value || 'No Subject';
+        const sender = headers.find((h: any) => h.name === 'From')?.value || 'Unknown Sender';
         const snippet = email.snippet || '';
         const internalDate = email.internalDate ? new Date(parseInt(email.internalDate)) : new Date();
 

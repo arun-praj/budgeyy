@@ -283,8 +283,13 @@ export async function getConnectedAccounts() {
         columns: {
             providerId: true,
             createdAt: true,
+            refreshToken: true, // Fetch it to check existence
         },
     });
 
-    return connected;
+    return connected.map(acc => ({
+        providerId: acc.providerId,
+        createdAt: acc.createdAt,
+        hasRefreshToken: !!acc.refreshToken, // Return boolean status
+    }));
 }

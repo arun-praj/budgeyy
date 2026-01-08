@@ -437,6 +437,8 @@ export const transactionalEmails = pgTable('transactional_emails', {
     subject: text('subject').notNull(),
     currency: text('currency').default('USD'),
     category: text('category'), // AI suggested category (string for now, or match existing category names)
+    isRead: boolean('is_read').default(false).notNull(),
+    isRejected: boolean('is_rejected').default(false).notNull(),
 
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
