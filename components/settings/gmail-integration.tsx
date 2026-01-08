@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import {
     Card,
@@ -12,13 +12,10 @@ import {
 import { Mail, RefreshCw, CheckCircle, AlertCircle, Loader2 } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 import { TransactionalEmailsList } from './transactional-emails-list';
-import { syncGmail } from '@/actions/gmail-sync';
+import { syncGmail, getRecentTransactionalEmails } from '@/actions/gmail-sync';
 import { toast } from "sonner";
 import { useRouter } from 'next/navigation';
-
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { getRecentTransactionalEmails } from "@/actions/gmail-sync";
-import { useEffect, useState } from "react";
 
 interface GmailIntegrationProps {
     accountStatus: {
@@ -41,13 +38,16 @@ export function GmailIntegration({ accountStatus, initialEmails }: GmailIntegrat
     useEffect(() => {
         setPendingEmails(initialEmails);
         const fetchOthers = async () => {
-            const rejected = await getRecentTransactionalEmails('rejected');
-            const cleared = await getRecentTransactionalEmails('cleared');
-            setRejectedEmails(rejected);
-            setClearedEmails(cleared);
+            if (isConnected) {
+                const rejected = await getRecentTransactionalEmails('rejected');
+                const cleared = await getRecentTransactionalEmails('cleared');
+                setRejectedEmails(rejected);
+                setClearedEmails(cleared);
+            }
         };
+        // Fetch initially
         fetchOthers();
-    }, [initialEmails]);
+    }, [initialEmails, isConnected]);
 
     const handleConnect = async () => {
         await authClient.linkSocial({
@@ -145,68 +145,34 @@ export function GmailIntegration({ accountStatus, initialEmails }: GmailIntegrat
                 </CardContent>
             </Card>
 
-            import {Tabs, TabsContent, TabsList, TabsTrigger} from "@/components/ui/tabs";
-            import {getRecentTransactionalEmails} from "@/actions/gmail-sync";
-            import {useEffect, useState} from "react";
-
-            // ... previous imports ...
-
-            export function GmailIntegration({accountStatus, initialEmails}: GmailIntegrationProps) {
-    const [isSyncing, setIsSyncing] = useState(false);
-            const [pendingEmails, setPendingEmails] = useState(initialEmails);
-            const [rejectedEmails, setRejectedEmails] = useState<any[]>([]);
-            const [clearedEmails, setClearedEmails] = useState<any[]>([]);
-
-    // Fetch other tabs on mount or tab change could be better, but simple fetch effect for now
-    useEffect(() => {
-        const fetchOthers = async () => {
-            const rejected = await getRecentTransactionalEmails('rejected');
-            const cleared = await getRecentTransactionalEmails('cleared');
-            setRejectedEmails(rejected);
-            setClearedEmails(cleared);
-        };
-            fetchOthers();
-    }, [initialEmails]); // Re-fetch when initial (pending) changes via sync/refresh
-
-            // ... existing handlers ...
-
-            return (
-            <div className="space-y-6">
+            {isConnected && (
                 <Card>
-                    {/* ... existing header and connection UI ... */}
-                    <CardContent className="space-y-4">
-                        {/* ... existing connection status UI ... */}
+                    <CardHeader>
+                        <CardTitle>Recent Emails</CardTitle>
+                        <CardDescription>
+                            Transactional emails identified by AI.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <Tabs defaultValue="pending">
+                            <TabsList>
+                                <TabsTrigger value="pending">Inbox ({pendingEmails.length})</TabsTrigger>
+                                <TabsTrigger value="rejected">Rejected ({rejectedEmails.length})</TabsTrigger>
+                                <TabsTrigger value="cleared">Cleared ({clearedEmails.length})</TabsTrigger>
+                            </TabsList>
+                            <TabsContent value="pending" className="mt-4">
+                                <TransactionalEmailsList emails={pendingEmails} type="pending" />
+                            </TabsContent>
+                            <TabsContent value="rejected" className="mt-4">
+                                <TransactionalEmailsList emails={rejectedEmails} type="rejected" />
+                            </TabsContent>
+                            <TabsContent value="cleared" className="mt-4">
+                                <TransactionalEmailsList emails={clearedEmails} type="cleared" />
+                            </TabsContent>
+                        </Tabs>
                     </CardContent>
                 </Card>
-
-                {isConnected && (
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Recent Emails</CardTitle>
-                            <CardDescription>
-                                Transactional emails identified by AI.
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <Tabs defaultValue="pending">
-                                <TabsList>
-                                    <TabsTrigger value="pending">Inbox ({pendingEmails.length})</TabsTrigger>
-                                    <TabsTrigger value="rejected">Rejected ({rejectedEmails.length})</TabsTrigger>
-                                    <TabsTrigger value="cleared">Cleared ({clearedEmails.length})</TabsTrigger>
-                                </TabsList>
-                                <TabsContent value="pending" className="mt-4">
-                                    <TransactionalEmailsList emails={pendingEmails} type="pending" />
-                                </TabsContent>
-                                <TabsContent value="rejected" className="mt-4">
-                                    <TransactionalEmailsList emails={rejectedEmails} type="rejected" />
-                                </TabsContent>
-                                <TabsContent value="cleared" className="mt-4">
-                                    <TransactionalEmailsList emails={clearedEmails} type="cleared" />
-                                </TabsContent>
-                            </Tabs>
-                        </CardContent>
-                    </Card>
-                )}
-            </div>
-            );
+            )}
+        </div>
+    );
 }

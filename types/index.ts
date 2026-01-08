@@ -1,4 +1,9 @@
-import type { Transaction, Category, User } from '@/db/schema';
+import { type InferSelectModel } from 'drizzle-orm';
+import { transactions, categories, users } from '@/db/schema';
+
+export type Transaction = InferSelectModel<typeof transactions>;
+export type Category = InferSelectModel<typeof categories>;
+export type User = InferSelectModel<typeof users>;
 
 // Transaction types
 export type TransactionType = 'income' | 'expense' | 'savings';

@@ -24,7 +24,7 @@ import { useDebounce } from 'use-debounce';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { User } from '@/db/schema';
+import type { User } from '@/types';
 import { NotionAvatar } from '@/components/avatars/notion-avatar';
 import { AvatarConfig } from '@/components/avatars/notion-avatar/types';
 

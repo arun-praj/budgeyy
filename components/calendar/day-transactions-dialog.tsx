@@ -12,7 +12,7 @@ import { getTransactions } from '@/actions/transactions';
 import { RecentTransactions } from '@/components/transactions/recent-transactions';
 import { formatDate } from '@/lib/date-utils';
 import { Loader2 } from 'lucide-react';
-import type { Transaction, Category } from '@/db/schema';
+// import type { Transaction, Category } from '@/db/schema';
 
 import type { TransactionWithUserAndCategory } from '@/types';
 

@@ -50,7 +50,7 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { ImageUpload } from '@/components/ui/image-upload';
 import { CategorySelector } from './category-selector';
-import type { Transaction, Category } from '@/db/schema';
+import type { Transaction, Category } from '@/types';
 import { NepaliDatePicker } from '../ui/nepali-date-picker';
 
 interface TransactionWithCategory extends Transaction {

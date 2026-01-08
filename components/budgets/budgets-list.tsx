@@ -26,7 +26,11 @@ import { cn } from '@/lib/utils';
 import { deleteBudget } from '@/actions/budgets';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
-import type { Budget, Category } from '@/db/schema';
+import { budgets, categories } from '@/db/schema';
+import { type InferSelectModel } from 'drizzle-orm';
+
+type Budget = InferSelectModel<typeof budgets>;
+type Category = InferSelectModel<typeof categories>;
 
 interface BudgetWithCategory extends Budget {
     category: Category | null;
