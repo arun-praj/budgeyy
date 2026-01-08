@@ -36,7 +36,7 @@ export async function syncGmail() {
         // TODO: Handle token refresh if expired (check account.expiresAt)
         // For now, assuming token is valid or recently refreshed by better-auth login
 
-        const emails = await fetchRecentEmails(account.accessToken, 10); // Sync last 10 for now
+        const emails = await fetchRecentEmails(account.accessToken, 4); // Sync last 10 for now
 
         let syncedCount = 0;
 
@@ -61,17 +61,20 @@ export async function syncGmail() {
             // Classify with Gemini
             const classification = await classifyEmail(subject, sender, snippet);
 
-            if (classification.isTransactional) {
+            if (classification.isTransactional && classification.amount != null) {
                 await db.insert(transactionalEmails).values({
                     userId,
                     emailId,
                     sender,
                     subject,
+                    description: classification.description || `${sender} - ${subject}`,
+                    // Ensure amount is stored as string for decimal column
+                    amount: String(classification.amount),
+                    currency: classification.currency || 'NPR',
                     date: internalDate,
-                    amount: classification.amount ? String(classification.amount) : null,
-                    currency: classification.currency || 'USD',
                     category: classification.category,
-                    summary: classification.summary,
+                    type: 'expense',
+                    isCleared: false,
                 });
                 syncedCount++;
             }

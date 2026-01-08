@@ -418,21 +418,30 @@ export const tripTransactionPayersRelations = relations(tripTransactionPayers, (
 
 
 // Transactional Emails Table
+// Transactional Emails Table - modeled after transactions
+
 export const transactionalEmails = pgTable('transactional_emails', {
     id: uuid('id').primaryKey().defaultRandom(),
     userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
     emailId: text('email_id').notNull().unique(), // Gmail message ID
+
+    // Core Transaction Fields
+    amount: decimal('amount', { precision: 12, scale: 2 }).notNull(),
+    date: timestamp('date').notNull(),
+    description: text('description').notNull(), // "Sender - Product/Summary"
+    type: transactionTypeEnum('type').notNull().default('expense'), // Usually expense, sometimes income (salary/transfer)
+    isCleared: boolean('is_cleared').default(false).notNull(), // Always false initially, until user verifies
+
+    // Metadata
     sender: text('sender').notNull(),
     subject: text('subject').notNull(),
-    amount: decimal('amount', { precision: 12, scale: 2 }),
     currency: text('currency').default('USD'),
-    date: timestamp('date').notNull(),
-    category: text('category'),
-    summary: text('summary'),
-    // rawContent: text('raw_content'), // Optional: keep for debugging if needed, maybe truncate?
+    category: text('category'), // AI suggested category (string for now, or match existing category names)
+
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
+
 
 export const transactionalEmailsRelations = relations(transactionalEmails, ({ one }) => ({
     user: one(users, {
