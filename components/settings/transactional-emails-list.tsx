@@ -10,8 +10,8 @@ import {
 } from "@/components/ui/table";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
-import { CreditCard, Receipt, FileText, X } from "lucide-react";
-import { rejectEmailTransaction } from "@/actions/reject-transaction";
+import { CreditCard, Receipt, FileText, X, RotateCcw } from "lucide-react";
+import { rejectEmailTransaction, restoreEmailTransaction } from "@/actions/reject-transaction";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -20,20 +20,21 @@ interface TransactionalEmail {
     id: string;
     sender: string;
     subject: string;
+    description: string;
     amount: string | null;
     currency: string | null;
     date: Date;
     category: string | null;
-    description: string; // Updated interface
 }
 
 import { VerifyTransactionDialog } from "@/components/transactions/verify-transaction-dialog";
 
 interface TransactionalEmailsListProps {
     emails: TransactionalEmail[];
+    type?: 'pending' | 'rejected' | 'cleared' | 'all';
 }
 
-export function TransactionalEmailsList({ emails }: TransactionalEmailsListProps) {
+export function TransactionalEmailsList({ emails, type = 'pending' }: TransactionalEmailsListProps) {
     const router = useRouter();
 
     const handleReject = async (id: string) => {
@@ -44,6 +45,17 @@ export function TransactionalEmailsList({ emails }: TransactionalEmailsListProps
             router.refresh();
         } catch (error) {
             toast.error("Failed to reject transaction");
+        }
+    };
+
+    const handleRestore = async (id: string) => {
+        try {
+            const result = await restoreEmailTransaction(id);
+            if (result.error) throw new Error(result.error);
+            toast.success("Transaction restored to Inbox");
+            router.refresh();
+        } catch (error) {
+            toast.error("Failed to restore transaction");
         }
     };
 
@@ -100,20 +112,36 @@ export function TransactionalEmailsList({ emails }: TransactionalEmailsListProps
                                             <span className="text-muted-foreground">-</span>
                                         )}
                                     </span>
+                                    {type === 'rejected' ? (
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-8 w-8 text-muted-foreground hover:text-primary"
+                                            onClick={() => handleRestore(email.id)}
+                                            title="Restore to Inbox"
+                                        >
+                                            <RotateCcw className="h-4 w-4" />
+                                        </Button>
+                                    ) : type === 'pending' || type === 'all' ? (
+                                        <>
+                                            <VerifyTransactionDialog
+                                                email={email}
+                                            />
 
-                                    <VerifyTransactionDialog
-                                        email={email}
-                                    />
-
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-8 w-8 text-muted-foreground hover:text-red-500"
-                                        onClick={() => handleReject(email.id)}
-                                        title="Reject"
-                                    >
-                                        <X className="h-4 w-4" />
-                                    </Button>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-8 w-8 text-muted-foreground hover:text-red-500"
+                                                onClick={() => handleReject(email.id)}
+                                                title="Reject"
+                                            >
+                                                <X className="h-4 w-4" />
+                                            </Button>
+                                        </>
+                                    ) : (
+                                        // Cleared - maybe show 'View' later?
+                                        <div className="text-xs text-muted-foreground italic">Cleared</div>
+                                    )}
                                 </div>
                             </TableCell>
                         </TableRow>

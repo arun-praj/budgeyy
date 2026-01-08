@@ -1,7 +1,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
-import { gmailSyncState, accounts } from '@/db/schema';
+import { accounts, users } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 import { syncGmail } from '@/actions/gmail-sync'; // We might need a modified version that accepts userId/historyId
 

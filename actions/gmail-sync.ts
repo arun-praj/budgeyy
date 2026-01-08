@@ -177,7 +177,7 @@ export async function syncGmail() {
     }
 }
 
-export async function getRecentTransactionalEmails() {
+export async function getRecentTransactionalEmails(filter: 'pending' | 'rejected' | 'cleared' | 'all' = 'pending') {
     const session = await auth.api.getSession({
         headers: await headers(),
     });
@@ -186,10 +186,30 @@ export async function getRecentTransactionalEmails() {
         return [];
     }
 
+    let whereClause = eq(transactionalEmails.userId, session.user.id);
+
+    if (filter === 'pending') {
+        whereClause = and(
+            whereClause,
+            eq(transactionalEmails.isCleared, false),
+            eq(transactionalEmails.isRejected, false)
+        ) as any;
+    } else if (filter === 'rejected') {
+        whereClause = and(
+            whereClause,
+            eq(transactionalEmails.isRejected, true)
+        ) as any;
+    } else if (filter === 'cleared') {
+        whereClause = and(
+            whereClause,
+            eq(transactionalEmails.isCleared, true)
+        ) as any;
+    }
+
     const emails = await db.query.transactionalEmails.findMany({
-        where: eq(transactionalEmails.userId, session.user.id),
+        where: whereClause,
         orderBy: [desc(transactionalEmails.date)],
-        limit: 20,
+        limit: 50, // Increased limit for better visibility
     });
 
     return emails;

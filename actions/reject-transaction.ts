@@ -32,3 +32,29 @@ export async function rejectEmailTransaction(emailId: string) {
         return { error: error.message || 'Failed to reject transaction' };
     }
 }
+
+export async function restoreEmailTransaction(emailId: string) {
+    const session = await auth.api.getSession({
+        headers: await headers(),
+    });
+
+    if (!session?.user?.id) {
+        return { error: 'Unauthorized' };
+    }
+
+    try {
+        await db.update(transactionalEmails)
+            .set({ isRejected: false })
+            .where(and(
+                eq(transactionalEmails.id, emailId),
+                eq(transactionalEmails.userId, session.user.id)
+            ));
+
+        revalidatePath('/dashboard');
+        revalidatePath('/settings');
+        return { success: true };
+    } catch (error: any) {
+        console.error('Failed to restore transaction:', error);
+        return { error: error.message || 'Failed to restore transaction' };
+    }
+}
