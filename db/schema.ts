@@ -443,10 +443,23 @@ export const transactionalEmails = pgTable('transactional_emails', {
 });
 
 
+
 export const transactionalEmailsRelations = relations(transactionalEmails, ({ one }) => ({
     user: one(users, {
         fields: [transactionalEmails.userId],
         references: [users.id],
     }),
 }));
+
+// Gmail Sync State Table (for History ID and Watch tracking)
+export const gmailSyncState = pgTable('gmail_sync_state', {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }).unique(),
+    historyId: text('history_id'), // Last processed history ID
+    watchExpiration: timestamp('watch_expiration'), // When the watch needs renewal
+    lastSyncedAt: timestamp('last_synced_at').defaultNow(),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
 
