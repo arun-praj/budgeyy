@@ -21,7 +21,7 @@ import { db } from '@/db';
 import { users } from '@/db/schema';
 import { inArray, eq } from 'drizzle-orm';
 
-export const dynamic = 'force-dynamic';
+
 
 interface TripDetailsPageProps {
     params: {

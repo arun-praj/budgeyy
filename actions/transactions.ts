@@ -5,9 +5,12 @@ import { transactions, categories } from '@/db/schema';
 import { eq, and, gte, lte, desc, sql, isNull } from 'drizzle-orm';
 import { auth } from '@/lib/auth';
 import { headers } from 'next/headers';
-import { revalidatePath } from 'next/cache';
+import { revalidatePath, revalidateTag, cacheTag, cacheLife } from 'next/cache';
 import { getCurrentMonthRange } from '@/lib/date-utils';
 import type { NecessityLevel, TransactionType } from '@/types';
+
+// Helper for consistency
+const getUserTxTag = (userId: string) => `user-${userId}-transactions`;
 
 export interface CreateTransactionData {
     amount: number;
@@ -49,6 +52,7 @@ export async function createTransaction(data: CreateTransactionData) {
             })
             .returning();
 
+        revalidateTag(getUserTxTag(session.user.id), 'max');
         revalidatePath('/dashboard');
         revalidatePath('/transactions');
         return { success: true, data: transaction };
@@ -91,6 +95,7 @@ export async function updateTransaction(id: string, data: CreateTransactionData)
             return { error: 'Transaction not found or unauthorized' };
         }
 
+        revalidateTag(getUserTxTag(session.user.id), 'max');
         revalidatePath('/dashboard');
         revalidatePath('/transactions');
         return { success: true, data: transaction };
@@ -100,10 +105,67 @@ export async function updateTransaction(id: string, data: CreateTransactionData)
     }
 }
 
+// --- Cached Internal Functions ---
+
+interface CachedTransactionsOptions {
+    userId: string;
+    page: number;
+    pageSize: number;
+    startStr?: string; // ISO Date String
+    endStr?: string;   // ISO Date String
+    categoryId?: string;
+    type?: TransactionType;
+    search?: string;
+    necessityLevel?: NecessityLevel;
+}
+
+async function getCachedTransactionsInternal({ userId, page, pageSize, startStr, endStr, categoryId, type, search, necessityLevel }: CachedTransactionsOptions) {
+    'use cache';
+    cacheTag(getUserTxTag(userId));
+    cacheLife('minutes');
+
+    const offset = (page - 1) * pageSize;
+    const start = startStr ? new Date(startStr) : undefined;
+    const end = endStr ? new Date(endStr) : undefined;
+
+    const conditions = [
+        eq(transactions.userId, userId),
+        eq(transactions.isDeleted, false),
+        isNull(transactions.tripId)
+    ];
+    if (start) conditions.push(gte(transactions.date, start));
+    if (end) conditions.push(lte(transactions.date, end));
+    if (categoryId && categoryId !== 'all') conditions.push(eq(transactions.categoryId, categoryId));
+    if (type && type !== 'all' as any) conditions.push(eq(transactions.type, type));
+
+    if (search) conditions.push(sql`LOWER(${transactions.description}) LIKE ${'%' + search.toLowerCase() + '%'}`);
+    if (necessityLevel && necessityLevel !== 'all' as any) conditions.push(eq(transactions.necessityLevel, necessityLevel));
+
+    const data = await db.query.transactions.findMany({
+        where: and(...conditions),
+        with: {
+            category: true,
+            user: true,
+        },
+        orderBy: [desc(transactions.date)],
+        limit: pageSize,
+        offset: offset,
+    });
+
+    const [countResult] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(transactions)
+        .where(and(...conditions));
+
+    const totalCount = Number(countResult?.count || 0);
+
+    return { data, totalCount };
+}
+
 export async function getTransactions(options: {
     page?: number;
     pageSize?: number;
-    limit?: number; // Legacy, map to pageSize if provided
+    limit?: number;
     start?: Date;
     end?: Date;
     categoryId?: string;
@@ -121,74 +183,33 @@ export async function getTransactions(options: {
 
     const page = options.page || 1;
     const pageSize = options.limit || options.pageSize || 20;
-    const offset = (page - 1) * pageSize;
 
-    const conditions = [
-        eq(transactions.userId, session.user.id),
-        eq(transactions.isDeleted, false),
-        isNull(transactions.tripId)
-    ];
-    if (options.start) conditions.push(gte(transactions.date, options.start));
-    if (options.end) conditions.push(lte(transactions.date, options.end));
-    if (options.categoryId && options.categoryId !== 'all') conditions.push(eq(transactions.categoryId, options.categoryId));
-    if (options.type && options.type !== 'all' as any) conditions.push(eq(transactions.type, options.type));
-
-    // New Filters
-    if (options.search) conditions.push(sql`LOWER(${transactions.description}) LIKE ${'%' + options.search.toLowerCase() + '%'}`);
-    if (options.necessityLevel && options.necessityLevel !== 'all' as any) conditions.push(eq(transactions.necessityLevel, options.necessityLevel));
-
-    // Get Data
-    const data = await db.query.transactions.findMany({
-        where: and(...conditions),
-        with: {
-            category: true,
-            user: true,
-        },
-        orderBy: [desc(transactions.date)],
-        limit: pageSize,
-        offset: offset,
+    return await getCachedTransactionsInternal({
+        userId: session.user.id,
+        page,
+        pageSize,
+        startStr: options.start?.toISOString(),
+        endStr: options.end?.toISOString(),
+        categoryId: options.categoryId,
+        type: options.type,
+        search: options.search,
+        necessityLevel: options.necessityLevel
     });
-
-    // Get Total Count
-    // Use raw query for count for performance or simpler aggregation
-    // Or just fetch ID and count in code if dataset is small, but SQL count is better
-    // Drizzle doesn't have a simple count() with query builder conditions easily reuseable
-    // So we repeat conditions in a select count() query
-
-    // We can use db.select({ count: count() }).from(transactions)...
-    // But we need to reconstruct 'and(...conditions)' with the right table reference
-    // The 'conditions' array is already built with imported 'transactions' table reference
-
-    // NOTE: 'count' import needed from drizzle-orm
-    const [countResult] = await db
-        .select({ count: sql<number>`count(*)` })
-        .from(transactions)
-        .where(and(...conditions));
-
-    const totalCount = Number(countResult?.count || 0);
-
-    return { data, totalCount };
 }
 
-export async function getDashboardStats({ start, end }: { start: Date; end: Date }) {
-    const session = await auth.api.getSession({
-        headers: await headers(),
-    });
+// --- Dashboard Stats ---
 
-    if (!session?.user?.id) {
-        return {
-            totalIncome: 0,
-            totalExpenses: 0,
-            needsSpent: 0,
-            wantsSpent: 0,
-            savingsAmount: 0,
-        };
-    }
+async function getCachedDashboardStatsInternal(userId: string, startStr: string, endStr: string) {
+    'use cache';
+    cacheTag(getUserTxTag(userId));
+    cacheLife('minutes');
 
-    // Get all transactions for the specified range
+    const start = new Date(startStr);
+    const end = new Date(endStr);
+
     const rangeTransactions = await db.query.transactions.findMany({
         where: and(
-            eq(transactions.userId, session.user.id),
+            eq(transactions.userId, userId),
             eq(transactions.isDeleted, false),
             isNull(transactions.tripId),
             gte(transactions.date, start),
@@ -209,15 +230,11 @@ export async function getDashboardStats({ start, end }: { start: Date; end: Date
 
         if (tx.type === 'income') {
             stats.totalIncome += amount;
-            // If new system 'savings' type
         } else if (tx.type === 'savings') {
             stats.savingsAmount += amount;
         } else {
-            // Expenses
-            // Only count non-credit expenses effectively reducing the balance immediately
             if (!tx.isCredit) {
                 stats.totalExpenses += amount;
-
                 switch (tx.necessityLevel) {
                     case 'needs':
                         stats.needsSpent += amount;
@@ -232,10 +249,25 @@ export async function getDashboardStats({ start, end }: { start: Date; end: Date
         }
     }
 
-    // Explicit logic: Savings is only what is explicitly categorized as 'savings'
-    // Legacy fallback removed per user request (Net Savings should not be Income - Expenses)
-
     return stats;
+}
+
+export async function getDashboardStats({ start, end }: { start: Date; end: Date }) {
+    const session = await auth.api.getSession({
+        headers: await headers(),
+    });
+
+    if (!session?.user?.id) {
+        return {
+            totalIncome: 0,
+            totalExpenses: 0,
+            needsSpent: 0,
+            wantsSpent: 0,
+            savingsAmount: 0,
+        };
+    }
+
+    return await getCachedDashboardStatsInternal(session.user.id, start.toISOString(), end.toISOString());
 }
 
 export async function deleteTransaction(id: string) {
@@ -261,6 +293,7 @@ export async function deleteTransaction(id: string) {
                 )
             );
 
+        revalidateTag(getUserTxTag(session.user.id), 'max');
         revalidatePath('/dashboard');
         revalidatePath('/transactions');
         return { success: true };
@@ -315,7 +348,6 @@ export async function updateCategory(id: string, data: { name: string; type: Tra
                 name: data.name,
                 type: data.type,
                 icon: data.icon,
-                // userId check is in the where clause, so we don't need to update it
             })
             .where(
                 and(
@@ -347,7 +379,6 @@ export async function deleteCategory(id: string) {
     }
 
     try {
-        // Only allow deleting user's own categories
         const [deleted] = await db
             .delete(categories)
             .where(
@@ -387,7 +418,6 @@ export async function getCategories(type?: TransactionType) {
         conditions.push(eq(categories.type, type));
     }
 
-    // Get default categories and user's custom categories
     const result = await db.query.categories.findMany({
         where: and(...conditions),
         orderBy: [categories.name],
@@ -396,18 +426,19 @@ export async function getCategories(type?: TransactionType) {
     return result;
 }
 
-export async function getCalendarStats(start: Date, end: Date) {
-    const session = await auth.api.getSession({
-        headers: await headers(),
-    });
+// --- Cached Calendar Stats ---
 
-    if (!session?.user?.id) {
-        return [];
-    }
+async function getCachedCalendarStatsInternal(userId: string, startStr: string, endStr: string) {
+    'use cache';
+    cacheTag(getUserTxTag(userId));
+    cacheLife('minutes');
+
+    const start = new Date(startStr);
+    const end = new Date(endStr);
 
     const rangeTransactions = await db.query.transactions.findMany({
         where: and(
-            eq(transactions.userId, session.user.id),
+            eq(transactions.userId, userId),
             eq(transactions.isDeleted, false),
             isNull(transactions.tripId),
             gte(transactions.date, start),
@@ -415,8 +446,6 @@ export async function getCalendarStats(start: Date, end: Date) {
         ),
     });
 
-    // Aggregate by date (YYYY-MM-DD)
-    // Aggregate by date (YYYY-MM-DD)
     const dailyStats: Record<string, {
         income: number;
         expense: number;
@@ -444,24 +473,6 @@ export async function getCalendarStats(start: Date, end: Date) {
             dailyStats[dateKey].income += amount;
             dailyStats[dateKey].incomeCount += 1;
         } else if (tx.type === 'savings') {
-            // For calendar, we might want to track savings separately or just counts.
-            // Let's add 'savings' count support? 
-            // The current CalendarGrid expects income/expense. 
-            // Let's treat Savings as a positive flow or separate?
-            // User asked for "Expense, income and saving transaction type".
-            // Let's update `dailyStats` structure.
-
-            // For now, let's treat savings similarly to income in terms of "good" dots? 
-            // Or maybe just add it to 'income' for now to avoid breaking CalendarGrid types immediately?
-            // BETTER: Add savings to the stats object.
-
-            // We need to update the `dailyStats` type definition above this loop first.
-            // But wait, replace tool works in chunks.
-            // I will assume I can update the type definition in a separate chunk or just let TS infer if I initialized it differently.
-            // Actually, I need to update the initialization.
-
-            // Checking previous context: The user wants "Expense, income and saving".
-            // I should update Calendar logic to return savings too.
             dailyStats[dateKey].savings += amount;
             dailyStats[dateKey].savingsCount += 1;
         } else {
@@ -470,25 +481,37 @@ export async function getCalendarStats(start: Date, end: Date) {
         }
     }
 
-    // Convert to array
     return Object.entries(dailyStats).map(([date, stats]) => ({
         date,
         ...stats,
     }));
 }
 
-export async function getBudgetReportData(start: Date, end: Date) {
+export async function getCalendarStats(start: Date, end: Date) {
     const session = await auth.api.getSession({
         headers: await headers(),
     });
 
     if (!session?.user?.id) {
-        return null;
+        return [];
     }
+
+    return await getCachedCalendarStatsInternal(session.user.id, start.toISOString(), end.toISOString());
+}
+
+// --- Cached Budget Report Data ---
+
+async function getCachedBudgetReportDataInternal(userId: string, startStr: string, endStr: string) {
+    'use cache';
+    cacheTag(getUserTxTag(userId));
+    cacheLife('minutes');
+
+    const start = new Date(startStr);
+    const end = new Date(endStr);
 
     const rangeTransactions = await db.query.transactions.findMany({
         where: and(
-            eq(transactions.userId, session.user.id),
+            eq(transactions.userId, userId),
             eq(transactions.isDeleted, false),
             isNull(transactions.tripId),
             gte(transactions.date, start),
@@ -499,7 +522,6 @@ export async function getBudgetReportData(start: Date, end: Date) {
         }
     });
 
-    // Helper to aggregate by category
     const aggregateByCategory = (txs: typeof rangeTransactions) => {
         const map = new Map<string, number>();
 
@@ -513,29 +535,22 @@ export async function getBudgetReportData(start: Date, end: Date) {
             .map(([description, amount]) => ({
                 description,
                 amount,
-                // We don't really have a single date for aggregated items, 
-                // but the PDF might not strictly require it for the summary list.
-                // If it does, we can use the end date or null.
-                // Looking at budget-pdf.tsx, it uses description and amount.
             }))
-            .sort((a, b) => b.amount - a.amount); // Sort by highest amount
+            .sort((a, b) => b.amount - a.amount);
     };
 
     const incomeTxs = rangeTransactions.filter(t => t.type === 'income');
     const savingsTxs = rangeTransactions.filter(t => t.type === 'savings');
-    // For expenses, split by necessity
     const expenseTxs = rangeTransactions.filter(t => t.type !== 'income' && t.type !== 'savings');
     const needsTxs = expenseTxs.filter(t => t.necessityLevel === 'needs');
     const wantsTxs = expenseTxs.filter(t => t.necessityLevel === 'wants');
 
-    // Calculate totals
     const totalIncome = incomeTxs.reduce((sum, t) => sum + parseFloat(t.amount), 0);
     const totalSavings = savingsTxs.reduce((sum, t) => sum + parseFloat(t.amount), 0);
     const totalNeeds = needsTxs.reduce((sum, t) => sum + parseFloat(t.amount), 0);
     const totalWants = wantsTxs.reduce((sum, t) => sum + parseFloat(t.amount), 0);
-    const expenses = totalNeeds + totalWants; // Or total expenses from all non-income/non-savings
+    const expenses = totalNeeds + totalWants;
 
-    // Aggregate lists
     const income = aggregateByCategory(incomeTxs);
     const savings = aggregateByCategory(savingsTxs);
     const needs = aggregateByCategory(needsTxs);
@@ -556,10 +571,10 @@ export async function getBudgetReportData(start: Date, end: Date) {
         }
     };
 
-    // Fetch daily stats for insights
-    const dailyStats = await getCalendarStats(start, end);
+    // Note: getCalendarStats is also cached, so this internal call is fine but effectively double caching if called here.
+    // However, since we are inside a cached function, calling another cached function is supported (RDC).
+    const dailyStats = await getCachedCalendarStatsInternal(userId, startStr, endStr);
 
-    // Insight Helpers
     const today = new Date();
     const isCurrentMonth = start.getMonth() === today.getMonth() && start.getFullYear() === today.getFullYear();
     const daysInMonth = new Date(start.getFullYear(), start.getMonth() + 1, 0).getDate();
@@ -574,6 +589,18 @@ export async function getBudgetReportData(start: Date, end: Date) {
             isCurrentMonth
         }
     };
+}
+
+export async function getBudgetReportData(start: Date, end: Date) {
+    const session = await auth.api.getSession({
+        headers: await headers(),
+    });
+
+    if (!session?.user?.id) {
+        return null;
+    }
+
+    return await getCachedBudgetReportDataInternal(session.user.id, start.toISOString(), end.toISOString());
 }
 
 export async function restoreTransaction(id: string) {
@@ -599,9 +626,10 @@ export async function restoreTransaction(id: string) {
                 )
             );
 
+        revalidateTag(getUserTxTag(session.user.id), 'max');
         revalidatePath('/dashboard');
         revalidatePath('/transactions');
-        revalidatePath('/settings'); // Restore likely happens here
+        revalidatePath('/settings');
         return { success: true };
     } catch (error) {
         console.error('Failed to restore transaction:', error);
@@ -628,6 +656,11 @@ export async function permanentDeleteTransaction(id: string) {
                 )
             );
 
+        // No need to invalidate cache for permanent delete if it was already "soft deleted" and excluded from queries?
+        // Actually, restore logic suggests soft deletes are excluded.
+        // Permanent delete removes soft-deleted.
+        // It's safe to revalidate anyway.
+        revalidateTag(getUserTxTag(session.user.id), 'max');
         revalidatePath('/settings');
         return { success: true };
     } catch (error) {
@@ -645,7 +678,9 @@ export async function getDeletedTransactions() {
         return [];
     }
 
-    // Get deleted transactions within last 30 days
+    // This is less frequent, maybe skip caching or cache with different tag?
+    // Let's keep it dynamic for now (admin/recovery feature).
+    // Or cache it too.
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 

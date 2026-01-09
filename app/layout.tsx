@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-import { SyncProvider } from "@/components/providers/sync-provider";
+import { SyncWrapper } from "@/components/providers/sync-wrapper";
 
 export const viewport = {
   themeColor: "#000000",
@@ -68,12 +68,12 @@ export default function RootLayout({
           <Suspense fallback={null}>
             <ConnectedThemeSyncer />
           </Suspense>
-          <SyncProvider>
+          <SyncWrapper>
             {children}
             <SpeedInsights />
 
             <ServiceWorkerRegister />
-          </SyncProvider>
+          </SyncWrapper>
         </ThemeProvider>
       </body>
     </html>
