@@ -3,7 +3,7 @@
 import { auth } from '@/lib/auth';
 import { headers } from 'next/headers';
 import { db } from '@/db';
-import { accounts, transactionalEmails } from '@/db/schema';
+import { accounts, transactionalEmails, scannedEmails } from '@/db/schema';
 import { eq, and, desc } from 'drizzle-orm';
 import { fetchRecentEmails } from '@/lib/gmail';
 import { classifyEmail } from '@/lib/gemini';
@@ -119,14 +119,21 @@ export async function performGmailSync(userId: string) {
         const emailId = email.id;
         if (!emailId) continue;
 
-        // Check if already exists
+        // Check if already exists in transactional emails (to avoid re-parsing confirmed ones)
         const existing = await db.query.transactionalEmails.findFirst({
             where: eq(transactionalEmails.emailId, emailId),
         });
 
         if (existing) continue;
 
-        // Extract metadata
+        // Check if already logged in scannedEmails (to avoid duplicate logs if re-running same batch)
+        const existingScan = await db.query.scannedEmails.findFirst({
+            where: eq(scannedEmails.emailId, emailId),
+        });
+
+        if (existingScan) continue;
+
+
         // Extract metadata
         const headers = email.payload?.headers || [];
         const subject = headers.find((h: any) => h.name === 'Subject')?.value || 'No Subject';
@@ -136,6 +143,17 @@ export async function performGmailSync(userId: string) {
 
         // Classify with Gemini
         const classification = await classifyEmail(subject, sender, snippet);
+
+        // LOG EVERY SCAN
+        await db.insert(scannedEmails).values({
+            userId,
+            emailId,
+            sender,
+            subject,
+            snippet,
+            isTransactional: classification.isTransactional,
+            aiResponse: JSON.stringify(classification),
+        });
 
         if (classification.isTransactional && classification.amount != null) {
             await db.insert(transactionalEmails).values({
@@ -148,7 +166,7 @@ export async function performGmailSync(userId: string) {
                 currency: classification.currency || 'NPR',
                 date: internalDate,
                 category: classification.category,
-                type: 'expense',
+                type: (classification.type as 'income' | 'expense') || 'expense',
                 isCleared: false,
             });
             syncedCount++;
@@ -210,6 +228,24 @@ export async function getRecentTransactionalEmails(filter: 'pending' | 'rejected
         where: whereClause,
         orderBy: [desc(transactionalEmails.date)],
         limit: 50, // Increased limit for better visibility
+    });
+
+    return emails;
+}
+
+export async function getRecentScannedEmails() {
+    const session = await auth.api.getSession({
+        headers: await headers(),
+    });
+
+    if (!session?.user?.id) {
+        return [];
+    }
+
+    const emails = await db.query.scannedEmails.findMany({
+        where: eq(scannedEmails.userId, session.user.id),
+        orderBy: [desc(scannedEmails.createdAt)], // Order by scan time
+        limit: 50,
     });
 
     return emails;

@@ -453,6 +453,7 @@ export const transactionalEmailsRelations = relations(transactionalEmails, ({ on
     }),
 }));
 
+
 // Gmail Sync State Table (for History ID and Watch tracking)
 export const gmailSyncState = pgTable('gmail_sync_state', {
     id: uuid('id').primaryKey().defaultRandom(),
@@ -463,5 +464,28 @@ export const gmailSyncState = pgTable('gmail_sync_state', {
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
+
+// Recently Scanned Emails Log (Audit Trail)
+export const scannedEmails = pgTable('scanned_emails', {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    emailId: text('email_id').notNull(), // Not unique here, as we might re-scan? Or should be unique? Let's keep it unique to avoid dupes in log.
+    sender: text('sender'),
+    subject: text('subject'),
+    snippet: text('snippet'),
+
+    // AI Classification Result
+    isTransactional: boolean('is_transactional').notNull(),
+    aiResponse: text('ai_response'), // JSON string of full AI response for debugging
+
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+
+export const scannedEmailsRelations = relations(scannedEmails, ({ one }) => ({
+    user: one(users, {
+        fields: [scannedEmails.userId],
+        references: [users.id],
+    }),
+}));
 
 

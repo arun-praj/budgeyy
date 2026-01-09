@@ -8,7 +8,7 @@ const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 export async function classifyEmail(subject: string, sender: string, snippet: string) {
     const prompt = `
-    Analyze the following email metadata and determine if it is a **confirmed transactional email** (receipt, invoice, bank alert, bill payment, or successful transfer).
+    Analyze the following email metadata and determine if it is a **confirmed transactional email** (receipt, invoice, bank alert, bill payment, successful transfer, OR salary/income).
 
     CONTEXT:
     - Nepal Market: Esewa, Khalti, Fonepay, ConnectIPS, Siddhartha Bank, NMB, NIMB, Global IME, NIC Asia, Everest Bank.
@@ -23,21 +23,25 @@ export async function classifyEmail(subject: string, sender: string, snippet: st
     CLASSIFICATION RULES:
 
     1. **SIGNS OF A TRANSACTION (High Probability):**
-       - **Explicit Success:** "Payment successful", "Transaction completed", "You sent", "You received", "Paid", "Transfer successful".
+       - **Explicit Success:** "Payment successful", "Transaction completed", "You sent", "You received", "Paid", "Transfer successful", "Credit alert", "Debited".
+       - **Income/Salary:** "Salary for month", "Salary credited", "Payment received", "Bonus received", "This is the salary", "You have been paid".
        - **Financials:** Contains specific currency symbols/codes (Rs., NPR, $, USD) closer to numbers.
        - **Identifiers:** "Order #", "Receipt #", "Invoice #", "Ref ID", "Transaction ID".
-       - **Bank Alerts:** "Acct XX1234 Debited", "Credited", "Balance Deducted".
+       - **Bank Alerts:** "Acct XX1234 Debited", "Credited", "Balance Deducted", "Deposited".
     
     2. **SIGNS OF NON-TRANSACTION (False Positives - IGNORE THESE):**
        - **Intent/Abandoned:** "Complete your purchase", "Item left in cart", "Checkout now".
        - **Promotional:** "Offer", "Discount", "Sale", "Coupon", "Upgrade now".
-       - **Pre-Transaction:** "Payment due", "Bill is ready", "Statement available", "OTP", "Verification code", "Login alert".
+       - **Pre-Transaction:** "Payment due", "Bill is ready", "Statement available", "OTP", "Verification code", "Login alert" (UNLESS it says "Salary for..." which implies the act of paying).
        - **Requests:** "Request for payment", "Invoice received" (if it's just a notification of an incoming invoice, not proof of payment, unless context implies auto-deduction).
        - **Social/News:** Newsletters, privacy policy updates, terms of service.
 
     3. **DECISION LOGIC:**
        - Only return 'isTransactional: true' if the event represents a **completed financial movement** (money left or entered an account).
        - **CRITICAL:** If you cannot extract a specific numeric **Amount**, it is NOT a valid transaction for our purpose. Return 'isTransactional: false'.
+       - **TYPE INFERENCE:**
+         - Money LEAVING account (Payment, Purchase, Debit, Bill) -> 'expense'
+         - Money ENTERING account (Salary, Refund, Deposit, Receive) -> 'income'
 
     OUTPUT FORMAT:
     If transactional, return JSON:
@@ -46,6 +50,7 @@ export async function classifyEmail(subject: string, sender: string, snippet: st
         "amount": number, // MUST be a number, e.g. 500.50
         "currency": "NPR" | "USD" | string, // Default to 'NPR' if inferred from context
         "category": "purchase" | "bill" | "transfer" | "salary" | "other",
+        "type": "income" | "expense", // CRITICAL: Infer based on direction of money
         "description": "Sender - Product/Summary (e.g. 'Esewa - Electricity Bill')",
         "merchant": "Merchant/Bank Name"
     }
