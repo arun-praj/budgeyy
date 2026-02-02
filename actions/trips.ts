@@ -935,7 +935,7 @@ export async function updateTripTransaction(id: string, data: {
         return transaction;
     });
 
-    revalidateTag(getTripTag(itinerary.tripId));
+    revalidateTag(getTripTag(itinerary.tripId), 'max');
     revalidatePath(`/splitlog/${itinerary.tripId}`);
     return result;
 }

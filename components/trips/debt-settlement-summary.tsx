@@ -159,9 +159,9 @@ export function DebtSettlementSummary({ transactions, members, currency = 'USD' 
                                     <div className="flex items-center gap-2">
                                         <div className="relative">
                                             <Avatar className="h-8 w-8 border-2 border-background shadow-sm">
-                                                {fromUser?.avatar ? (
+                                                {(fromUser?.avatar || fromUser?.image) ? (
                                                     <div className="h-full w-full bg-muted flex items-center justify-center overflow-hidden bg-white">
-                                                        <NotionAvatar className="h-full w-full" config={getAvatarConfig(fromUser.avatar)} />
+                                                        <NotionAvatar className="h-full w-full" config={getAvatarConfig(fromUser.avatar || fromUser.image)} />
                                                     </div>
                                                 ) : (
                                                     <>
@@ -192,9 +192,9 @@ export function DebtSettlementSummary({ transactions, members, currency = 'USD' 
                                         </div>
                                         <div className="relative">
                                             <Avatar className="h-8 w-8 border-2 border-background shadow-sm">
-                                                {toUser?.avatar ? (
+                                                {(toUser?.avatar || toUser?.image) ? (
                                                     <div className="h-full w-full bg-muted flex items-center justify-center overflow-hidden bg-white">
-                                                        <NotionAvatar className="h-full w-full" config={getAvatarConfig(toUser.avatar)} />
+                                                        <NotionAvatar className="h-full w-full" config={getAvatarConfig(toUser.avatar || toUser.image)} />
                                                     </div>
                                                 ) : (
                                                     <>
