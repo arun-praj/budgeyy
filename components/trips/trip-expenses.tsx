@@ -8,6 +8,7 @@ import { NotionAvatar } from '@/components/avatars/notion-avatar';
 import { AvatarConfig } from '@/components/avatars/notion-avatar/types';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
+import { DebtSettlementSummary } from '@/components/trips/debt-settlement-summary';
 
 // Types (simplified representations of what we get from getTrip)
 // In a real app we might share these types via a separate file or infer them.
@@ -163,6 +164,13 @@ export function TripExpenses({ transactions, members, currency = 'USD' }: TripEx
                     </CardContent>
                 </Card>
             </div>
+
+            {/* Debt Settlement Summary */}
+            <DebtSettlementSummary
+                transactions={transactions}
+                members={members}
+                currency={currency}
+            />
 
             {/* 2. Balances / "Who owes who" simplified */}
             <Card>
