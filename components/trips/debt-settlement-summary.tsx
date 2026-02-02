@@ -153,15 +153,16 @@ export function DebtSettlementSummary({ transactions, members, currency = 'NPR' 
                         const toUser = getMember(s.to);
 
                         return (
-                            <div key={idx} className="flex items-center justify-between p-2 rounded-lg bg-background/60 border border-border/50 hover:bg-background transition-colors">
-                                <div className="flex items-center gap-3">
+
+                            <div key={idx} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-2 rounded-lg bg-background/60 border border-border/50 hover:bg-background transition-colors gap-2 sm:gap-0">
+                                <div className="flex items-center gap-3 w-full sm:w-auto">
                                     {/* From User */}
                                     <div className="flex items-center gap-2">
                                         <div className="relative">
                                             <Avatar className="h-8 w-8 border-2 border-background shadow-sm">
                                                 {(fromUser?.avatar || fromUser?.image) ? (
                                                     <div className="h-full w-full bg-muted flex items-center justify-center overflow-hidden bg-white">
-                                                        <NotionAvatar className="h-full w-full" config={getAvatarConfig(fromUser.avatar || fromUser.image)} />
+                                                        <NotionAvatar className="h-full w-full" config={getAvatarConfig(fromUser?.avatar || fromUser?.image)} />
                                                     </div>
                                                 ) : (
                                                     <>
@@ -194,7 +195,7 @@ export function DebtSettlementSummary({ transactions, members, currency = 'NPR' 
                                             <Avatar className="h-8 w-8 border-2 border-background shadow-sm">
                                                 {(toUser?.avatar || toUser?.image) ? (
                                                     <div className="h-full w-full bg-muted flex items-center justify-center overflow-hidden bg-white">
-                                                        <NotionAvatar className="h-full w-full" config={getAvatarConfig(toUser.avatar || toUser.image)} />
+                                                        <NotionAvatar className="h-full w-full" config={getAvatarConfig(toUser?.avatar || toUser?.image)} />
                                                     </div>
                                                 ) : (
                                                     <>
@@ -211,7 +212,7 @@ export function DebtSettlementSummary({ transactions, members, currency = 'NPR' 
                                 </div>
 
                                 {/* Amount */}
-                                <div className="font-bold text-emerald-600 dark:text-emerald-400 whitespace-nowrap pl-2">
+                                <div className="font-bold text-emerald-600 dark:text-emerald-400 whitespace-nowrap pl-0 sm:pl-2 self-end sm:self-auto">
                                     {currency} {s.amount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                                 </div>
                             </div>
