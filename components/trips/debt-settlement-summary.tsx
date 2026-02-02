@@ -19,7 +19,7 @@ interface Settlement {
     amount: number;
 }
 
-export function DebtSettlementSummary({ transactions, members, currency = 'USD' }: DebtSettlementSummaryProps) {
+export function DebtSettlementSummary({ transactions, members, currency = 'NPR' }: DebtSettlementSummaryProps) {
 
     // 1. Calculate Balances
     const balances = useMemo(() => {

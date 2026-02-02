@@ -52,7 +52,7 @@ interface TripExpensesProps {
     currency?: string;
 }
 
-export function TripExpenses({ transactions, members, currency = 'USD' }: TripExpensesProps) {
+export function TripExpenses({ transactions, members, currency = 'NPR' }: TripExpensesProps) {
 
     // 1. Math Engineering: Calculate Balances
     const { balances, totalTripCost } = useMemo(() => {

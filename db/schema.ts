@@ -24,7 +24,7 @@ export const users = pgTable('users', {
     country: text('country'),
     calendarPreference: calendarPreferenceEnum('calendar_preference').default('gregorian'),
     pricingTier: pricingTierEnum('pricing_tier').default('free'),
-    currency: text('currency').default('USD'),
+    currency: text('currency').default('NPR'),
     theme: themeEnum('theme').default('system'),
     avatar: text('avatar'), // Storing JSON string of avatar config
     onboardingCompleted: boolean('onboarding_completed').default(false),

@@ -162,7 +162,7 @@ export function ItineraryTimeline({ items, categories = [], tripId, members = []
     const activeItem = items.find(i => i.id === activeDayId);
 
     // Currency Helper
-    const userCurrency = currentUser?.currency || 'USD';
+    const userCurrency = currentUser?.currency || 'NPR';
 
     const handleSubmitChecklist = async () => {
         if (!activeDayId || !checklistTitle.trim()) return;
@@ -549,9 +549,8 @@ export function ItineraryTimeline({ items, categories = [], tripId, members = []
                                         </span>
                                     </div>
                                     {/* Vertical Line */}
-                                    {!isLast && (
-                                        <div className="w-0.5 bg-gray-200 dark:bg-gray-800 flex-1 my-1" />
-                                    )}
+                                    {/* Vertical Line */}
+                                    <div className="w-0.5 bg-gray-200 dark:bg-gray-800 flex-1 my-1" />
                                 </div>
 
                                 {/* Content (Right) */}

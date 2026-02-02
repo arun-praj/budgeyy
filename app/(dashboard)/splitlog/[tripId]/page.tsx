@@ -303,7 +303,7 @@ export default async function TripDetailsPage(props: TripDetailsPageProps) {
                         <TripExpenses
                             transactions={trip.tripTransactions}
                             members={memberUsers}
-                            currency={(currentUser as any).currency || 'USD'}
+                            currency={(currentUser as any).currency || 'NPR'}
                         />
                     </section>
                 </div>
