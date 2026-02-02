@@ -50,9 +50,10 @@ interface TripExpensesProps {
     transactions: any[]; // Using any to avoid complex nested Drizzle types for now, will cast or structure safely
     members: Member[];
     currency?: string;
+    readOnly?: boolean;
 }
 
-export function TripExpenses({ transactions, members, currency = 'NPR' }: TripExpensesProps) {
+export function TripExpenses({ transactions, members, currency = 'NPR', readOnly = false }: TripExpensesProps) {
 
     // 1. Math Engineering: Calculate Balances
     const { balances, totalTripCost } = useMemo(() => {

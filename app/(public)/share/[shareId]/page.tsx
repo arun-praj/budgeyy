@@ -146,7 +146,8 @@ export default async function PublicTripPage(props: PublicTripPageProps) {
                         <TripExpenses
                             transactions={trip.tripTransactions || []}
                             members={members}
-                            currency={'USD'} // Default for public view since we don't know viewer's pref
+                            currency={'NPR'} // Default to NPR as per user request
+                            readOnly={true}
                         />
                     </section>
                 </div>

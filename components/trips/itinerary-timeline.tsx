@@ -533,11 +533,10 @@ export function ItineraryTimeline({ items, categories = [], tripId, members = []
 
     return (
         <div className="w-full">
-            <DragDropContext onDragEnd={onDragEnd}>
+            {readOnly ? (
                 <div className="relative w-full space-y-0 pb-12">
                     {optimisticDays.map((item, index) => {
                         const isLast = index === optimisticDays.length - 1;
-
                         return (
                             <div key={item.id} className="relative flex group">
                                 {/* Timeline Line (Left) */}
@@ -549,13 +548,11 @@ export function ItineraryTimeline({ items, categories = [], tripId, members = []
                                         </span>
                                     </div>
                                     {/* Vertical Line */}
-                                    {/* Vertical Line */}
                                     <div className="w-0.5 bg-gray-200 dark:bg-gray-800 flex-1 my-1" />
                                 </div>
 
                                 {/* Content (Right) */}
                                 <div className="flex-1 pb-10 relative">
-
                                     {/* Header: Date + Title Block */}
                                     <div className="flex flex-col gap-1 mb-2 h-auto min-h-[40px] pl-3">
                                         <h3 className="text-lg font-bold text-foreground leading-none shrink-0">
@@ -565,542 +562,674 @@ export function ItineraryTimeline({ items, categories = [], tripId, members = []
                                         <div className="w-full">
                                             <ItineraryTitleEditor id={item.id} initialTitle={item.title} initialLocation={item.location} readOnly={readOnly} />
                                         </div>
-
-                                        {/* Menu - Absolute Top Right */}
-                                        {!readOnly && (
-                                            <div className="absolute top-0 right-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <DropdownMenu>
-                                                    <DropdownMenuTrigger asChild>
-                                                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:bg-muted">
-                                                            <MoreHorizontal className="h-4 w-4" />
-                                                        </Button>
-                                                    </DropdownMenuTrigger>
-                                                    <DropdownMenuContent align="end">
-                                                        <DropdownMenuItem
-                                                            className="text-destructive focus:text-destructive cursor-pointer"
-                                                            onClick={async () => {
-                                                                try {
-                                                                    await deleteItineraryDay(item.id);
-                                                                    toast.success('Day deleted');
-                                                                } catch (error) {
-                                                                    toast.error('Failed to delete day');
-                                                                }
-                                                            }}
-                                                        >
-                                                            <Trash2 className="h-4 w-4 mr-2" />
-                                                            Delete Day
-                                                        </DropdownMenuItem>
-                                                    </DropdownMenuContent>
-                                                </DropdownMenu>
-                                            </div>
-                                        )}
                                     </div>
 
-                                    {/* Combined Droppable Zone */}
-                                    <Droppable droppableId={item.id} type="unified-item">
-                                        {(provided, snapshot) => (
-                                            <div
-                                                ref={provided.innerRef}
-                                                {...provided.droppableProps}
-                                                className={cn(
-                                                    "relative transition-colors rounded-md p-2 -ml-2",
-                                                    // Only add min-height if dragging over, otherwise collapse
-                                                    snapshot.isDraggingOver ? "min-h-[50px] bg-muted/50" : "min-h-0 hover:bg-muted/10"
-                                                )}
-                                            >
-                                                {item.unifiedItems.map((unifiedItem, index) => (
-                                                    <Draggable key={unifiedItem.id} draggableId={unifiedItem.id} index={index}>
-                                                        {(provided, snapshot) => (
-                                                            <div
-                                                                ref={provided.innerRef}
-                                                                {...provided.draggableProps}
-                                                                style={provided.draggableProps.style}
-                                                                className={cn("mb-3 relative group/item", snapshot.isDragging && "z-50 opacity-90 scale-[1.02]")}
-                                                            >
-                                                                {/* Common Drag Handle - Absolute Positioned */}
-                                                                <div
-                                                                    {...provided.dragHandleProps}
-                                                                    className="absolute -left-6 top-1.5 opacity-0 group-hover/item:opacity-40 hover:!opacity-100 cursor-grab active:cursor-grabbing z-20 w-6 h-6 flex items-center justify-center"
-                                                                >
-                                                                    <GripVertical className="h-4 w-4 text-muted-foreground" />
+                                    {/* Static Content Zone (No DragDrop) */}
+                                    <div className="relative transition-colors rounded-md p-2 -ml-2 min-h-0">
+                                        {item.unifiedItems.map((unifiedItem, index) => (
+                                            <div key={unifiedItem.id} className="mb-3 relative group/item">
+                                                {/* Render Content Based on Type */}
+                                                {unifiedItem.type === 'transaction' && (
+                                                    (() => {
+                                                        const t = unifiedItem.data;
+                                                        // Calculate PayerText
+                                                        let payerText = '';
+                                                        const payers = t.payers || [];
+                                                        if (payers.length > 0) {
+                                                            const names = payers.map((p: any) => p.user ? (p.user.name || p.user.email.split('@')[0]) : (p.paidByUser?.name || p.paidByUser?.email?.split('@')[0] || 'Unknown'));
+                                                            if (names.length === 1) payerText = names[0];
+                                                            else if (names.length === 2) payerText = `${names[0]} and ${names[1]}`;
+                                                            else payerText = `${names[0]}, ${names[1]} & ${names.length - 2} others`;
+                                                        } else if (t.paidByUser) {
+                                                            payerText = t.paidByUser.name || t.paidByUser.email.split('@')[0];
+                                                        } else {
+                                                            payerText = 'Unknown';
+                                                        }
+
+                                                        // Generate Split Description
+                                                        const renderSplitDescription = () => {
+                                                            const splits = t.splits || [];
+                                                            if (splits.length === 0) return <span className="text-muted-foreground"> and did not split</span>;
+                                                            const splitNames = splits.map((s: any) => s.user ? (s.user.name || s.user.email.split('@')[0]) : 'Unknown');
+                                                            if (splitNames.length === 1) return <><span className="text-muted-foreground"> and split by </span><span className="font-medium text-foreground">{splitNames[0]}</span><span className="text-muted-foreground"> only</span></>;
+                                                            if (splitNames.length === members.length) return <><span className="text-muted-foreground"> and split by </span><span className="font-medium text-foreground">everyone</span><span className="text-muted-foreground"> equally</span></>;
+                                                            const namesStr = splitNames.length === 2 ? `${splitNames[0]} and ${splitNames[1]}` : `${splitNames.slice(0, -1).join(', ')} and ${splitNames[splitNames.length - 1]}`;
+                                                            return <><span className="text-muted-foreground"> and split by </span><span className="font-medium text-foreground">{namesStr}</span><span className="text-muted-foreground"> equally</span></>;
+                                                        };
+
+                                                        const timeText = t.date ? format(new Date(t.date), 'h:mm a') : '';
+
+                                                        return (
+                                                            <div className="flex items-start gap-3 relative p-3 rounded-lg border border-blue-200/50 bg-blue-50/30 dark:bg-blue-900/10 dark:border-blue-800/30 cursor-default">
+                                                                <div className="absolute -left-10 top-0 h-[13px] w-10 border-b-2 border-l-2 border-gray-200 dark:border-gray-800 rounded-bl-xl" />
+                                                                <div className="h-6 w-6 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 text-[10px] font-bold border border-blue-200 dark:border-blue-800">$</div>
+                                                                <div className="flex-1 text-sm flex justify-between items-start">
+                                                                    <div>
+                                                                        <div className="font-normal text-foreground/90 leading-relaxed">
+                                                                            <span className="font-semibold text-foreground">{payerText}</span>
+                                                                            <span className="text-muted-foreground"> paid </span>
+                                                                            <span className="font-bold text-emerald-600 dark:text-emerald-400">{userCurrency} {parseFloat(t.amount).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
+                                                                            <span className="text-muted-foreground"> for </span>
+                                                                            <span className="font-medium text-foreground">{t.description || 'Expense'}</span>
+                                                                            {renderSplitDescription()}
+                                                                            {timeText && <span className="text-muted-foreground/60 text-xs ml-1">at {timeText}</span>}
+                                                                        </div>
+                                                                    </div>
+                                                                    {unifiedItem.data.user?.avatar && (
+                                                                        <div className="h-5 w-5 rounded-full border bg-muted overflow-hidden shrink-0 ml-2" title={unifiedItem.data.user.name || 'User'}>
+                                                                            <NotionAvatar className="h-full w-full" config={getAvatarConfig(unifiedItem.data.user.avatar)} />
+                                                                        </div>
+                                                                    )}
                                                                 </div>
-
-                                                                {/* Render Content Based on Type */}
-                                                                {/* Render Content Based on Type */}
-                                                                {unifiedItem.type === 'transaction' && (
-                                                                    (() => {
-                                                                        // Helper to generator natural language description
-                                                                        const t = unifiedItem.data;
-
-                                                                        // 1. Payers
-                                                                        let payerText = '';
-                                                                        const payers = t.payers || [];
-                                                                        if (payers.length > 0) {
-                                                                            const names = payers.map((p: any) => p.user ? (p.user.name || p.user.email.split('@')[0]) : (p.paidByUser?.name || p.paidByUser?.email?.split('@')[0] || 'Unknown'));
-                                                                            if (names.length === 1) payerText = names[0];
-                                                                            else if (names.length === 2) payerText = `${names[0]} and ${names[1]}`;
-                                                                            else payerText = `${names[0]}, ${names[1]} & ${names.length - 2} others`;
-                                                                        } else if (t.paidByUser) {
-                                                                            payerText = t.paidByUser.name || t.paidByUser.email.split('@')[0];
-                                                                        } else {
-                                                                            payerText = 'Unknown';
-                                                                        }
-
-                                                                        // 2. Splits Logic & Rendering
-                                                                        const renderSplitDescription = () => {
-                                                                            const splits = t.splits || [];
-
-                                                                            // Case: Did not split
-                                                                            if (splits.length === 0) {
-                                                                                return <span className="text-muted-foreground"> and did not split</span>;
-                                                                            }
-
-                                                                            const splitNames = splits.map((s: any) => {
-                                                                                return s.user ? (s.user.name || s.user.email.split('@')[0]) : 'Unknown';
-                                                                            });
-
-                                                                            // Case: Split by X only
-                                                                            if (splitNames.length === 1) {
-                                                                                return (
-                                                                                    <>
-                                                                                        <span className="text-muted-foreground"> and split by </span>
-                                                                                        <span className="font-medium text-foreground">{splitNames[0]}</span>
-                                                                                        <span className="text-muted-foreground"> only</span>
-                                                                                    </>
-                                                                                );
-                                                                            }
-
-                                                                            // Case: Split by everyone
-                                                                            if (splitNames.length === members.length) {
-                                                                                return (
-                                                                                    <>
-                                                                                        <span className="text-muted-foreground"> and split by </span>
-                                                                                        <span className="font-medium text-foreground">everyone</span>
-                                                                                        <span className="text-muted-foreground"> equally</span>
-                                                                                    </>
-                                                                                );
-                                                                            }
-
-                                                                            // Case: Specific subset
-                                                                            const namesStr = splitNames.length === 2
-                                                                                ? `${splitNames[0]} and ${splitNames[1]}`
-                                                                                : `${splitNames.slice(0, -1).join(', ')} and ${splitNames[splitNames.length - 1]}`;
-
-                                                                            return (
-                                                                                <>
-                                                                                    <span className="text-muted-foreground"> and split by </span>
-                                                                                    <span className="font-medium text-foreground">{namesStr}</span>
-                                                                                    <span className="text-muted-foreground"> equally</span>
-                                                                                </>
-                                                                            );
-                                                                        };
-
-                                                                        // 3. Time
-                                                                        const timeText = t.date ? format(new Date(t.date), 'h:mm a') : '';
-
-                                                                        return (
-                                                                            <div
-                                                                                className="flex items-start gap-3 relative p-3 rounded-lg border border-blue-200/50 bg-blue-50/30 dark:bg-blue-900/10 dark:border-blue-800/30 hover:bg-blue-50/60 dark:hover:bg-blue-900/20 transition-colors cursor-pointer group/card"
-                                                                                onClick={() => handleEditTransaction(t)}
-                                                                            >
-                                                                                {/* Thread Line */}
-                                                                                <div className="absolute -left-10 top-0 h-[13px] w-10 border-b-2 border-l-2 border-gray-200 dark:border-gray-800 rounded-bl-xl" />
-
-                                                                                <div className="h-6 w-6 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 text-[10px] font-bold border border-blue-200 dark:border-blue-800">
-                                                                                    $
-                                                                                </div>
-                                                                                <div className="flex-1 text-sm flex justify-between items-start">
-                                                                                    <div>
-                                                                                        <div className="font-normal text-foreground/90 leading-relaxed">
-                                                                                            <span className="font-semibold text-foreground">{payerText}</span>
-                                                                                            <span className="text-muted-foreground"> paid </span>
-                                                                                            <span className="font-bold text-emerald-600 dark:text-emerald-400">{userCurrency} {parseFloat(t.amount).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
-                                                                                            <span className="text-muted-foreground"> for </span>
-                                                                                            <span className="font-medium text-foreground">{t.description || 'Expense'}</span>
-                                                                                            {renderSplitDescription()}
-                                                                                            {timeText && (
-                                                                                                <span className="text-muted-foreground/60 text-xs ml-1">
-                                                                                                    at {timeText}
-                                                                                                </span>
-                                                                                            )}
-                                                                                        </div>
-                                                                                    </div>
-
-                                                                                    <div className="flex items-center gap-2 shrink-0 ml-2">
-                                                                                        {/* Avatar - Far Right */}
-                                                                                        {unifiedItem.data.user?.avatar && (
-                                                                                            <div className="h-5 w-5 rounded-full border bg-muted overflow-hidden shrink-0" title={unifiedItem.data.user.name || 'User'}>
-                                                                                                <NotionAvatar
-                                                                                                    className="h-full w-full"
-                                                                                                    config={getAvatarConfig(unifiedItem.data.user.avatar)}
-                                                                                                />
-                                                                                            </div>
-                                                                                        )}
-                                                                                        <Button
-                                                                                            variant="ghost"
-                                                                                            size="icon"
-                                                                                            className="h-6 w-6 opacity-0 group-hover/card:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
-                                                                                            onClick={(e) => {
-                                                                                                e.stopPropagation();
-                                                                                                handleDeleteTransaction(unifiedItem.id);
-                                                                                            }}
-                                                                                        >
-                                                                                            <Trash2 className="h-3 w-3" />
-                                                                                        </Button>
-                                                                                    </div>
-                                                                                </div>
-                                                                            </div>
-                                                                        );
-                                                                    })()
-                                                                )}
-
-                                                                {unifiedItem.type === 'note' && (
-                                                                    <ItineraryNoteEditor
-                                                                        id={unifiedItem.data.id}
-                                                                        initialContent={unifiedItem.data.content}
-                                                                        initialPriority={unifiedItem.data.isHighPriority}
-                                                                        createdAt={unifiedItem.data.createdAt}
-                                                                        onDelete={() => handleDeleteNote(unifiedItem.id)}
-                                                                        creator={unifiedItem.data.user} // Pass creator
-                                                                        readOnly={readOnly}
-                                                                    />
-                                                                )}
-
-                                                                {unifiedItem.type === 'checklist' && (
-                                                                    <ItineraryChecklistEditor
-                                                                        checklist={unifiedItem.data}
-                                                                        onDelete={() => handleDeleteChecklist(unifiedItem.id)}
-                                                                        creator={unifiedItem.data.user} // Pass creator
-                                                                        readOnly={readOnly}
-                                                                    />
-                                                                )}
                                                             </div>
-                                                        )}
-                                                    </Draggable>
-                                                ))}
-                                                {provided.placeholder}
-
-                                                {/* Only show placeholder if dragging over AND empty */}
-                                                {item.unifiedItems.length === 0 && snapshot.isDraggingOver && (
-                                                    <div className={cn("h-8 flex items-center justify-center text-xs text-muted-foreground/50 transition-all border-2 border-dashed border-muted-foreground/20 rounded-lg")}>
-                                                        Drop items here
-                                                    </div>
+                                                        );
+                                                    })()
                                                 )}
 
-                                                {/* Pending Note Input - Kept inside for better flow */}
-                                                {pendingNoteDayId === item.id && (
-                                                    <div className="mt-2">
-                                                        <ItineraryNoteEditor
-                                                            isNew
-                                                            itineraryId={item.id}
-                                                            initialPriority={false}
-                                                            onCancel={handleClosePendingNote}
-                                                            onNoteCreated={handleClosePendingNote}
-                                                        />
-                                                    </div>
+                                                {unifiedItem.type === 'note' && (
+                                                    <ItineraryNoteEditor
+                                                        id={unifiedItem.data.id}
+                                                        initialContent={unifiedItem.data.content}
+                                                        initialPriority={unifiedItem.data.isHighPriority}
+                                                        createdAt={unifiedItem.data.createdAt}
+                                                        onDelete={() => { }}
+                                                        creator={unifiedItem.data.user}
+                                                        readOnly={true}
+                                                    />
+                                                )}
+
+                                                {unifiedItem.type === 'checklist' && (
+                                                    <ItineraryChecklistEditor
+                                                        checklist={unifiedItem.data}
+                                                        onDelete={() => { }}
+                                                        creator={unifiedItem.data.user}
+                                                        readOnly={true}
+                                                    />
                                                 )}
                                             </div>
-                                        )}
-                                    </Droppable>
-
-                                    {/* Quick Add Toolbar - Left Aligned, Upgraded */}
-                                    {!readOnly && (
-                                        <div className="relative group/item -mt-3 opacity-70 hover:opacity-100 transition-opacity focus-within:opacity-100 pb-2">
-                                            {/* Connector - Shortened */}
-                                            <div className="absolute -left-10 top-0 h-[13px] w-10 border-b-2 border-l-2 border-gray-200 dark:border-gray-800 rounded-bl-xl" />
-
-                                            <div className="flex items-start gap-3">
-                                                {/* Dot/Icon */}
-                                                <div className="h-6 w-6 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-400 flex items-center justify-center shrink-0">
-                                                    <div className="h-2 w-2 rounded-full bg-current" />
-                                                </div>
-
-                                                {/* Action Icons - Reverted to left-aligned */}
-                                                <div className="flex items-center gap-2">
-                                                    <Button
-                                                        variant="outline"
-                                                        size="icon"
-                                                        className="h-9 w-9 rounded-full bg-background border shadow-sm text-muted-foreground hover:text-emerald-600 hover:border-emerald-200 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-all"
-                                                        onClick={() => handleCreateNote(item.id)}
-                                                        title="Add Note"
-                                                    >
-                                                        <StickyNote className="h-4 w-4" />
-                                                    </Button>
-                                                    <Button
-                                                        variant="outline"
-                                                        size="icon"
-                                                        className="h-9 w-9 rounded-full bg-background border shadow-sm text-muted-foreground hover:text-emerald-600 hover:border-emerald-200 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-all"
-                                                        onClick={() => handleOpenDialog('checklist', item.id, item.tripId)}
-                                                        title="Add Checklist"
-                                                    >
-                                                        <CheckSquare className="h-4 w-4" />
-                                                    </Button>
-                                                    <Button
-                                                        variant="outline"
-                                                        size="icon"
-                                                        className="h-9 w-9 rounded-full bg-background border shadow-sm text-muted-foreground hover:text-emerald-600 hover:border-emerald-200 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-all"
-                                                        onClick={() => handleOpenDialog('expense', item.id, item.tripId)}
-                                                        title="Add Expense"
-                                                    >
-                                                        <DollarSign className="h-4 w-4" />
-                                                    </Button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    )}
+                                        ))}
+                                    </div>
                                 </div>
                             </div>
                         );
                     })}
+                </div>
+            ) : (
+                <DragDropContext onDragEnd={onDragEnd}>
+                    <div className="relative w-full space-y-0 pb-12">
+                        {optimisticDays.map((item, index) => {
+                            const isLast = index === optimisticDays.length - 1;
 
-                    {/* Add Day Button */}
-                    <div className="flex group pt-4">
-                        {/* Timeline Line Placeholder */}
-                        <div className="flex flex-col items-center mr-6 opacity-0">
-                            <div className="w-8 h-8" />
-                        </div>
-
-                        {/* Add Day Button */}
-                        {!readOnly && (
-                            <div className="flex-1 pb-10">
-                                <Button
-                                    variant="ghost"
-                                    className="w-full h-12 border-2 border-dashed border-muted hover:border-emerald-500/50 hover:bg-emerald-50/50 dark:hover:bg-emerald-900/10 text-muted-foreground hover:text-emerald-600 transition-all rounded-xl gap-2 group/btn"
-                                    onClick={handleAddDay}
-                                    disabled={isAddingDay}
-                                >
-                                    {isAddingDay ? (
-                                        <Loader2 className="h-4 w-4 animate-spin" />
-                                    ) : (
-                                        <Plus className="h-4 w-4 group-hover/btn:scale-110 transition-transform" />
-                                    )}
-                                    Add Another Day
-                                </Button>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Dialogs */}
-
-                    <Dialog open={dialogType === 'checklist'} onOpenChange={(open) => !open && handleCloseDialog()}>
-                        <DialogContent>
-                            <DialogHeader>
-                                <DialogTitle>Create Checklist</DialogTitle>
-                            </DialogHeader>
-                            <div className="py-4">
-                                <Label>Checklist Title</Label>
-                                <Input
-                                    value={checklistTitle}
-                                    onChange={(e) => setChecklistTitle(e.target.value)}
-                                    placeholder="Packing List, Places to Eat..."
-                                    className="mt-2"
-                                />
-                            </div>
-                            <DialogFooter>
-                                <Button variant="outline" onClick={handleCloseDialog}>Cancel</Button>
-                                <Button onClick={handleSubmitChecklist} disabled={isSubmitting}>Create Checklist</Button>
-                            </DialogFooter>
-                        </DialogContent>
-                    </Dialog>
-
-                    <Dialog open={dialogType === 'expense'} onOpenChange={(open) => !open && handleCloseDialog()}>
-                        <DialogContent>
-                            <DialogHeader>
-                                <DialogTitle>{editingTransactionId ? 'Edit Expense' : 'Add Expense'}</DialogTitle>
-                            </DialogHeader>
-                            <div className="space-y-4 py-4">
-                                <div>
-                                    <Label>Amount ({userCurrency})</Label>
-                                    <Input
-                                        type="number"
-                                        value={expenseAmount}
-                                        onChange={(e) => setExpenseAmount(e.target.value)}
-                                        placeholder="0.00"
-                                        className="mt-1.5"
-                                    />
-                                </div>
-                                <div>
-                                    <Label>Description</Label>
-                                    <Input
-                                        value={expenseDesc}
-                                        onChange={(e) => setExpenseDesc(e.target.value)}
-                                        placeholder="What was this for?"
-                                        className="mt-1.5"
-                                    />
-                                </div>
-
-                                {/* Paid By */}
-                                <div className="space-y-2">
-                                    <div className="flex items-center justify-between">
-                                        <Label>Paid By</Label>
-                                        <div className="flex items-center space-x-2">
-                                            <Checkbox
-                                                id="multi-payer"
-                                                checked={isMultiPayer}
-                                                onCheckedChange={(checked) => {
-                                                    setIsMultiPayer(!!checked);
-                                                    // If switching to multi, maybe auto-set current user to full?
-                                                    if (checked && Object.keys(multiPayerAmounts).length === 0) {
-                                                        setMultiPayerAmounts({ [payerId]: expenseAmount });
-                                                    }
-                                                }}
-                                            />
-                                            <Label htmlFor="multi-payer" className="text-xs font-normal text-muted-foreground cursor-pointer">Multiple Payers</Label>
+                            return (
+                                <div key={item.id} className="relative flex group">
+                                    {/* Timeline Line (Left) */}
+                                    <div className="flex flex-col items-center mr-6">
+                                        {/* Day Icon/Dot */}
+                                        <div className="w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center shrink-0 border-2 border-background z-10 relative">
+                                            <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                                                {item.dayNumber}
+                                            </span>
                                         </div>
+                                        {/* Vertical Line */}
+                                        {/* Vertical Line */}
+                                        <div className="w-0.5 bg-gray-200 dark:bg-gray-800 flex-1 my-1" />
                                     </div>
 
-                                    {!isMultiPayer ? (
-                                        <Select value={payerId} onValueChange={setPayerId}>
-                                            <SelectTrigger className="mt-1.5">
-                                                <SelectValue placeholder="Select payer" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {members.map(member => (
-                                                    <SelectItem key={member.id} value={member.id}>
-                                                        <div className="flex items-center gap-2">
-                                                            <div className="h-5 w-5 rounded-full border bg-muted overflow-hidden shrink-0">
-                                                                <NotionAvatar className="h-full w-full" config={getAvatarConfig(member.image)} />
-                                                            </div>
-                                                            <span>{member.name || member.email}</span>
+                                    {/* Content (Right) */}
+                                    <div className="flex-1 pb-10 relative">
+
+                                        {/* Header: Date + Title Block */}
+                                        <div className="flex flex-col gap-1 mb-2 h-auto min-h-[40px] pl-3">
+                                            <h3 className="text-lg font-bold text-foreground leading-none shrink-0">
+                                                {item.date ? format(new Date(item.date), 'EEEE, MMMM do') : `Day ${item.dayNumber}`}
+                                            </h3>
+                                            {/* Editable Title & Location - Now Stacked */}
+                                            <div className="w-full">
+                                                <ItineraryTitleEditor id={item.id} initialTitle={item.title} initialLocation={item.location} readOnly={readOnly} />
+                                            </div>
+
+                                            {/* Menu - Absolute Top Right */}
+                                            {!readOnly && (
+                                                <div className="absolute top-0 right-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <DropdownMenu>
+                                                        <DropdownMenuTrigger asChild>
+                                                            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:bg-muted">
+                                                                <MoreHorizontal className="h-4 w-4" />
+                                                            </Button>
+                                                        </DropdownMenuTrigger>
+                                                        <DropdownMenuContent align="end">
+                                                            <DropdownMenuItem
+                                                                className="text-destructive focus:text-destructive cursor-pointer"
+                                                                onClick={async () => {
+                                                                    try {
+                                                                        await deleteItineraryDay(item.id);
+                                                                        toast.success('Day deleted');
+                                                                    } catch (error) {
+                                                                        toast.error('Failed to delete day');
+                                                                    }
+                                                                }}
+                                                            >
+                                                                <Trash2 className="h-4 w-4 mr-2" />
+                                                                Delete Day
+                                                            </DropdownMenuItem>
+                                                        </DropdownMenuContent>
+                                                    </DropdownMenu>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Combined Droppable Zone */}
+                                        <Droppable droppableId={item.id} type="unified-item">
+                                            {(provided, snapshot) => (
+                                                <div
+                                                    ref={provided.innerRef}
+                                                    {...provided.droppableProps}
+                                                    className={cn(
+                                                        "relative transition-colors rounded-md p-2 -ml-2",
+                                                        // Only add min-height if dragging over, otherwise collapse
+                                                        snapshot.isDraggingOver ? "min-h-[50px] bg-muted/50" : "min-h-0 hover:bg-muted/10"
+                                                    )}
+                                                >
+                                                    {item.unifiedItems.map((unifiedItem, index) => (
+                                                        <Draggable key={unifiedItem.id} draggableId={unifiedItem.id} index={index}>
+                                                            {(provided, snapshot) => (
+                                                                <div
+                                                                    ref={provided.innerRef}
+                                                                    {...provided.draggableProps}
+                                                                    style={provided.draggableProps.style}
+                                                                    className={cn("mb-3 relative group/item", snapshot.isDragging && "z-50 opacity-90 scale-[1.02]")}
+                                                                >
+                                                                    {/* Common Drag Handle - Absolute Positioned */}
+                                                                    <div
+                                                                        {...provided.dragHandleProps}
+                                                                        className={cn(
+                                                                            "absolute -left-6 top-1.5 opacity-0 group-hover/item:opacity-40 hover:!opacity-100 cursor-grab active:cursor-grabbing z-20 w-6 h-6 flex items-center justify-center",
+                                                                            readOnly && "hidden"
+                                                                        )}
+                                                                    >
+                                                                        <GripVertical className="h-4 w-4 text-muted-foreground" />
+                                                                    </div>
+
+                                                                    {/* Render Content Based on Type */}
+                                                                    {/* Render Content Based on Type */}
+                                                                    {unifiedItem.type === 'transaction' && (
+                                                                        (() => {
+                                                                            // Helper to generator natural language description
+                                                                            const t = unifiedItem.data;
+
+                                                                            // 1. Payers
+                                                                            let payerText = '';
+                                                                            const payers = t.payers || [];
+                                                                            if (payers.length > 0) {
+                                                                                const names = payers.map((p: any) => p.user ? (p.user.name || p.user.email.split('@')[0]) : (p.paidByUser?.name || p.paidByUser?.email?.split('@')[0] || 'Unknown'));
+                                                                                if (names.length === 1) payerText = names[0];
+                                                                                else if (names.length === 2) payerText = `${names[0]} and ${names[1]}`;
+                                                                                else payerText = `${names[0]}, ${names[1]} & ${names.length - 2} others`;
+                                                                            } else if (t.paidByUser) {
+                                                                                payerText = t.paidByUser.name || t.paidByUser.email.split('@')[0];
+                                                                            } else {
+                                                                                payerText = 'Unknown';
+                                                                            }
+
+                                                                            // 2. Splits Logic & Rendering
+                                                                            const renderSplitDescription = () => {
+                                                                                const splits = t.splits || [];
+
+                                                                                // Case: Did not split
+                                                                                if (splits.length === 0) {
+                                                                                    return <span className="text-muted-foreground"> and did not split</span>;
+                                                                                }
+
+                                                                                const splitNames = splits.map((s: any) => {
+                                                                                    return s.user ? (s.user.name || s.user.email.split('@')[0]) : 'Unknown';
+                                                                                });
+
+                                                                                // Case: Split by X only
+                                                                                if (splitNames.length === 1) {
+                                                                                    return (
+                                                                                        <>
+                                                                                            <span className="text-muted-foreground"> and split by </span>
+                                                                                            <span className="font-medium text-foreground">{splitNames[0]}</span>
+                                                                                            <span className="text-muted-foreground"> only</span>
+                                                                                        </>
+                                                                                    );
+                                                                                }
+
+                                                                                // Case: Split by everyone
+                                                                                if (splitNames.length === members.length) {
+                                                                                    return (
+                                                                                        <>
+                                                                                            <span className="text-muted-foreground"> and split by </span>
+                                                                                            <span className="font-medium text-foreground">everyone</span>
+                                                                                            <span className="text-muted-foreground"> equally</span>
+                                                                                        </>
+                                                                                    );
+                                                                                }
+
+                                                                                // Case: Specific subset
+                                                                                const namesStr = splitNames.length === 2
+                                                                                    ? `${splitNames[0]} and ${splitNames[1]}`
+                                                                                    : `${splitNames.slice(0, -1).join(', ')} and ${splitNames[splitNames.length - 1]}`;
+
+                                                                                return (
+                                                                                    <>
+                                                                                        <span className="text-muted-foreground"> and split by </span>
+                                                                                        <span className="font-medium text-foreground">{namesStr}</span>
+                                                                                        <span className="text-muted-foreground"> equally</span>
+                                                                                    </>
+                                                                                );
+                                                                            };
+
+                                                                            // 3. Time
+                                                                            const timeText = t.date ? format(new Date(t.date), 'h:mm a') : '';
+
+                                                                            return (
+                                                                                <div
+                                                                                    className={cn(
+                                                                                        "flex items-start gap-3 relative p-3 rounded-lg border border-blue-200/50 bg-blue-50/30 dark:bg-blue-900/10 dark:border-blue-800/30 transition-colors group/card",
+                                                                                        !readOnly && "hover:bg-blue-50/60 dark:hover:bg-blue-900/20 cursor-pointer"
+                                                                                    )}
+                                                                                    onClick={() => !readOnly && handleEditTransaction(t)}
+                                                                                >
+                                                                                    {/* Thread Line */}
+                                                                                    <div className="absolute -left-10 top-0 h-[13px] w-10 border-b-2 border-l-2 border-gray-200 dark:border-gray-800 rounded-bl-xl" />
+
+                                                                                    <div className="h-6 w-6 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 text-[10px] font-bold border border-blue-200 dark:border-blue-800">
+                                                                                        $
+                                                                                    </div>
+                                                                                    <div className="flex-1 text-sm flex justify-between items-start">
+                                                                                        <div>
+                                                                                            <div className="font-normal text-foreground/90 leading-relaxed">
+                                                                                                <span className="font-semibold text-foreground">{payerText}</span>
+                                                                                                <span className="text-muted-foreground"> paid </span>
+                                                                                                <span className="font-bold text-emerald-600 dark:text-emerald-400">{userCurrency} {parseFloat(t.amount).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
+                                                                                                <span className="text-muted-foreground"> for </span>
+                                                                                                <span className="font-medium text-foreground">{t.description || 'Expense'}</span>
+                                                                                                {renderSplitDescription()}
+                                                                                                {timeText && (
+                                                                                                    <span className="text-muted-foreground/60 text-xs ml-1">
+                                                                                                        at {timeText}
+                                                                                                    </span>
+                                                                                                )}
+                                                                                            </div>
+                                                                                        </div>
+
+                                                                                        <div className="flex items-center gap-2 shrink-0 ml-2">
+                                                                                            {/* Avatar - Far Right */}
+                                                                                            {unifiedItem.data.user?.avatar && (
+                                                                                                <div className="h-5 w-5 rounded-full border bg-muted overflow-hidden shrink-0" title={unifiedItem.data.user.name || 'User'}>
+                                                                                                    <NotionAvatar
+                                                                                                        className="h-full w-full"
+                                                                                                        config={getAvatarConfig(unifiedItem.data.user.avatar)}
+                                                                                                    />
+                                                                                                </div>
+                                                                                            )}
+                                                                                            <Button
+                                                                                                variant="ghost"
+                                                                                                size="icon"
+                                                                                                className="h-6 w-6 opacity-0 group-hover/card:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
+                                                                                                onClick={(e) => {
+                                                                                                    e.stopPropagation();
+                                                                                                    handleDeleteTransaction(unifiedItem.id);
+                                                                                                }}
+                                                                                            >
+                                                                                                <Trash2 className="h-3 w-3" />
+                                                                                            </Button>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                </div>
+                                                                            );
+                                                                        })()
+                                                                    )}
+
+                                                                    {unifiedItem.type === 'note' && (
+                                                                        <ItineraryNoteEditor
+                                                                            id={unifiedItem.data.id}
+                                                                            initialContent={unifiedItem.data.content}
+                                                                            initialPriority={unifiedItem.data.isHighPriority}
+                                                                            createdAt={unifiedItem.data.createdAt}
+                                                                            onDelete={() => handleDeleteNote(unifiedItem.id)}
+                                                                            creator={unifiedItem.data.user} // Pass creator
+                                                                            readOnly={readOnly}
+                                                                        />
+                                                                    )}
+
+                                                                    {unifiedItem.type === 'checklist' && (
+                                                                        <ItineraryChecklistEditor
+                                                                            checklist={unifiedItem.data}
+                                                                            onDelete={() => handleDeleteChecklist(unifiedItem.id)}
+                                                                            creator={unifiedItem.data.user} // Pass creator
+                                                                            readOnly={readOnly}
+                                                                        />
+                                                                    )}
+                                                                </div>
+                                                            )}
+                                                        </Draggable>
+                                                    ))}
+                                                    {provided.placeholder}
+
+                                                    {/* Only show placeholder if dragging over AND empty */}
+                                                    {item.unifiedItems.length === 0 && snapshot.isDraggingOver && (
+                                                        <div className={cn("h-8 flex items-center justify-center text-xs text-muted-foreground/50 transition-all border-2 border-dashed border-muted-foreground/20 rounded-lg")}>
+                                                            Drop items here
                                                         </div>
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    ) : (
-                                        <div className="space-y-2 border rounded-md p-2 max-h-[200px] overflow-y-auto bg-muted/20">
-                                            {members.map(member => {
-                                                const isPayer = Object.keys(multiPayerAmounts).includes(member.id);
-                                                return (
-                                                    <div key={member.id} className="flex items-center gap-2">
-                                                        <Checkbox
-                                                            id={`payer-${member.id}`}
-                                                            checked={isPayer}
-                                                            onCheckedChange={(checked) => {
-                                                                const newMap = { ...multiPayerAmounts };
-                                                                if (checked) {
-                                                                    newMap[member.id] = ''; // Init empty or 0
-                                                                } else {
-                                                                    delete newMap[member.id];
-                                                                }
-                                                                setMultiPayerAmounts(newMap);
-                                                            }}
-                                                        />
-                                                        <div className="flex-1 flex items-center justify-between gap-2">
-                                                            <Label htmlFor={`payer-${member.id}`} className="flex items-center gap-2 cursor-pointer">
+                                                    )}
+
+                                                    {/* Pending Note Input - Kept inside for better flow */}
+                                                    {pendingNoteDayId === item.id && (
+                                                        <div className="mt-2">
+                                                            <ItineraryNoteEditor
+                                                                isNew
+                                                                itineraryId={item.id}
+                                                                initialPriority={false}
+                                                                onCancel={handleClosePendingNote}
+                                                                onNoteCreated={handleClosePendingNote}
+                                                            />
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </Droppable>
+
+                                        {/* Quick Add Toolbar - Left Aligned, Upgraded */}
+                                        {!readOnly && (
+                                            <div className="relative group/item -mt-3 opacity-70 hover:opacity-100 transition-opacity focus-within:opacity-100 pb-2">
+                                                {/* Connector - Shortened */}
+                                                <div className="absolute -left-10 top-0 h-[13px] w-10 border-b-2 border-l-2 border-gray-200 dark:border-gray-800 rounded-bl-xl" />
+
+                                                <div className="flex items-start gap-3">
+                                                    {/* Dot/Icon */}
+                                                    <div className="h-6 w-6 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-400 flex items-center justify-center shrink-0">
+                                                        <div className="h-2 w-2 rounded-full bg-current" />
+                                                    </div>
+
+                                                    {/* Action Icons - Reverted to left-aligned */}
+                                                    <div className="flex items-center gap-2">
+                                                        <Button
+                                                            variant="outline"
+                                                            size="icon"
+                                                            className="h-9 w-9 rounded-full bg-background border shadow-sm text-muted-foreground hover:text-emerald-600 hover:border-emerald-200 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-all"
+                                                            onClick={() => handleCreateNote(item.id)}
+                                                            title="Add Note"
+                                                        >
+                                                            <StickyNote className="h-4 w-4" />
+                                                        </Button>
+                                                        <Button
+                                                            variant="outline"
+                                                            size="icon"
+                                                            className="h-9 w-9 rounded-full bg-background border shadow-sm text-muted-foreground hover:text-emerald-600 hover:border-emerald-200 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-all"
+                                                            onClick={() => handleOpenDialog('checklist', item.id, item.tripId)}
+                                                            title="Add Checklist"
+                                                        >
+                                                            <CheckSquare className="h-4 w-4" />
+                                                        </Button>
+                                                        <Button
+                                                            variant="outline"
+                                                            size="icon"
+                                                            className="h-9 w-9 rounded-full bg-background border shadow-sm text-muted-foreground hover:text-emerald-600 hover:border-emerald-200 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-all"
+                                                            onClick={() => handleOpenDialog('expense', item.id, item.tripId)}
+                                                            title="Add Expense"
+                                                        >
+                                                            <DollarSign className="h-4 w-4" />
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })}
+
+                        {/* Add Day Button */}
+                        <div className="flex group pt-4">
+                            {/* Timeline Line Placeholder */}
+                            <div className="flex flex-col items-center mr-6 opacity-0">
+                                <div className="w-8 h-8" />
+                            </div>
+
+                            {/* Add Day Button */}
+                            {!readOnly && (
+                                <div className="flex-1 pb-10">
+                                    <Button
+                                        variant="ghost"
+                                        className="w-full h-12 border-2 border-dashed border-muted hover:border-emerald-500/50 hover:bg-emerald-50/50 dark:hover:bg-emerald-900/10 text-muted-foreground hover:text-emerald-600 transition-all rounded-xl gap-2 group/btn"
+                                        onClick={handleAddDay}
+                                        disabled={isAddingDay}
+                                    >
+                                        {isAddingDay ? (
+                                            <Loader2 className="h-4 w-4 animate-spin" />
+                                        ) : (
+                                            <Plus className="h-4 w-4 group-hover/btn:scale-110 transition-transform" />
+                                        )}
+                                        Add Another Day
+                                    </Button>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Dialogs */}
+
+                        <Dialog open={dialogType === 'checklist'} onOpenChange={(open) => !open && handleCloseDialog()}>
+                            <DialogContent>
+                                <DialogHeader>
+                                    <DialogTitle>Create Checklist</DialogTitle>
+                                </DialogHeader>
+                                <div className="py-4">
+                                    <Label>Checklist Title</Label>
+                                    <Input
+                                        value={checklistTitle}
+                                        onChange={(e) => setChecklistTitle(e.target.value)}
+                                        placeholder="Packing List, Places to Eat..."
+                                        className="mt-2"
+                                    />
+                                </div>
+                                <DialogFooter>
+                                    <Button variant="outline" onClick={handleCloseDialog}>Cancel</Button>
+                                    <Button onClick={handleSubmitChecklist} disabled={isSubmitting}>Create Checklist</Button>
+                                </DialogFooter>
+                            </DialogContent>
+                        </Dialog>
+
+                        <Dialog open={dialogType === 'expense'} onOpenChange={(open) => !open && handleCloseDialog()}>
+                            <DialogContent>
+                                <DialogHeader>
+                                    <DialogTitle>{editingTransactionId ? 'Edit Expense' : 'Add Expense'}</DialogTitle>
+                                </DialogHeader>
+                                <div className="space-y-4 py-4">
+                                    <div>
+                                        <Label>Amount ({userCurrency})</Label>
+                                        <Input
+                                            type="number"
+                                            value={expenseAmount}
+                                            onChange={(e) => setExpenseAmount(e.target.value)}
+                                            placeholder="0.00"
+                                            className="mt-1.5"
+                                        />
+                                    </div>
+                                    <div>
+                                        <Label>Description</Label>
+                                        <Input
+                                            value={expenseDesc}
+                                            onChange={(e) => setExpenseDesc(e.target.value)}
+                                            placeholder="What was this for?"
+                                            className="mt-1.5"
+                                        />
+                                    </div>
+
+                                    {/* Paid By */}
+                                    <div className="space-y-2">
+                                        <div className="flex items-center justify-between">
+                                            <Label>Paid By</Label>
+                                            <div className="flex items-center space-x-2">
+                                                <Checkbox
+                                                    id="multi-payer"
+                                                    checked={isMultiPayer}
+                                                    onCheckedChange={(checked) => {
+                                                        setIsMultiPayer(!!checked);
+                                                        // If switching to multi, maybe auto-set current user to full?
+                                                        if (checked && Object.keys(multiPayerAmounts).length === 0) {
+                                                            setMultiPayerAmounts({ [payerId]: expenseAmount });
+                                                        }
+                                                    }}
+                                                />
+                                                <Label htmlFor="multi-payer" className="text-xs font-normal text-muted-foreground cursor-pointer">Multiple Payers</Label>
+                                            </div>
+                                        </div>
+
+                                        {!isMultiPayer ? (
+                                            <Select value={payerId} onValueChange={setPayerId}>
+                                                <SelectTrigger className="mt-1.5">
+                                                    <SelectValue placeholder="Select payer" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {members.map(member => (
+                                                        <SelectItem key={member.id} value={member.id}>
+                                                            <div className="flex items-center gap-2">
                                                                 <div className="h-5 w-5 rounded-full border bg-muted overflow-hidden shrink-0">
                                                                     <NotionAvatar className="h-full w-full" config={getAvatarConfig(member.image)} />
                                                                 </div>
-                                                                <span className="text-sm font-normal">{member.name || member.email}</span>
-                                                            </Label>
-                                                            {isPayer && (
-                                                                <Input
-                                                                    type="number"
-                                                                    className="h-7 w-24 text-right"
-                                                                    placeholder="0.00"
-                                                                    value={multiPayerAmounts[member.id] || ''}
-                                                                    onChange={(e) => {
-                                                                        setMultiPayerAmounts({
-                                                                            ...multiPayerAmounts,
-                                                                            [member.id]: e.target.value
-                                                                        });
-                                                                    }}
-                                                                />
-                                                            )}
+                                                                <span>{member.name || member.email}</span>
+                                                            </div>
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        ) : (
+                                            <div className="space-y-2 border rounded-md p-2 max-h-[200px] overflow-y-auto bg-muted/20">
+                                                {members.map(member => {
+                                                    const isPayer = Object.keys(multiPayerAmounts).includes(member.id);
+                                                    return (
+                                                        <div key={member.id} className="flex items-center gap-2">
+                                                            <Checkbox
+                                                                id={`payer-${member.id}`}
+                                                                checked={isPayer}
+                                                                onCheckedChange={(checked) => {
+                                                                    const newMap = { ...multiPayerAmounts };
+                                                                    if (checked) {
+                                                                        newMap[member.id] = ''; // Init empty or 0
+                                                                    } else {
+                                                                        delete newMap[member.id];
+                                                                    }
+                                                                    setMultiPayerAmounts(newMap);
+                                                                }}
+                                                            />
+                                                            <div className="flex-1 flex items-center justify-between gap-2">
+                                                                <Label htmlFor={`payer-${member.id}`} className="flex items-center gap-2 cursor-pointer">
+                                                                    <div className="h-5 w-5 rounded-full border bg-muted overflow-hidden shrink-0">
+                                                                        <NotionAvatar className="h-full w-full" config={getAvatarConfig(member.image)} />
+                                                                    </div>
+                                                                    <span className="text-sm font-normal">{member.name || member.email}</span>
+                                                                </Label>
+                                                                {isPayer && (
+                                                                    <Input
+                                                                        type="number"
+                                                                        className="h-7 w-24 text-right"
+                                                                        placeholder="0.00"
+                                                                        value={multiPayerAmounts[member.id] || ''}
+                                                                        onChange={(e) => {
+                                                                            setMultiPayerAmounts({
+                                                                                ...multiPayerAmounts,
+                                                                                [member.id]: e.target.value
+                                                                            });
+                                                                        }}
+                                                                    />
+                                                                )}
+                                                            </div>
                                                         </div>
-                                                    </div>
-                                                );
-                                            })}
-                                            <div className="flex justify-end pt-1 border-t mt-2">
-                                                <span className={cn(
-                                                    "text-xs font-medium",
-                                                    Math.abs(Object.values(multiPayerAmounts).reduce((sum, val) => sum + (parseFloat(val) || 0), 0) - (parseFloat(expenseAmount) || 0)) > 0.01
-                                                        ? "text-destructive"
-                                                        : "text-emerald-600"
-                                                )}>
-                                                    Total Paid: {Object.values(multiPayerAmounts).reduce((sum, val) => sum + (parseFloat(val) || 0), 0).toFixed(2)} / {expenseAmount || '0.00'}
-                                                </span>
+                                                    );
+                                                })}
+                                                <div className="flex justify-end pt-1 border-t mt-2">
+                                                    <span className={cn(
+                                                        "text-xs font-medium",
+                                                        Math.abs(Object.values(multiPayerAmounts).reduce((sum, val) => sum + (parseFloat(val) || 0), 0) - (parseFloat(expenseAmount) || 0)) > 0.01
+                                                            ? "text-destructive"
+                                                            : "text-emerald-600"
+                                                    )}>
+                                                        Total Paid: {Object.values(multiPayerAmounts).reduce((sum, val) => sum + (parseFloat(val) || 0), 0).toFixed(2)} / {expenseAmount || '0.00'}
+                                                    </span>
+                                                </div>
                                             </div>
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* Split Type */}
-                                <div>
-                                    <Label className="mb-2 block">Split</Label>
-                                    <div className="flex gap-2 mb-3">
-                                        <Button
-                                            type="button"
-                                            variant={splitType === 'equal' ? 'default' : 'outline'}
-                                            size="sm"
-                                            onClick={() => setSplitType('equal')}
-                                            className="flex-1"
-                                        >
-                                            Everyone
-                                        </Button>
-                                        <Button
-                                            type="button"
-                                            variant={splitType === 'specific' ? 'default' : 'outline'}
-                                            size="sm"
-                                            onClick={() => setSplitType('specific')}
-                                            className="flex-1"
-                                        >
-                                            Specific
-                                        </Button>
-                                        <Button
-                                            type="button"
-                                            variant={splitType === 'none' ? 'default' : 'outline'}
-                                            size="sm"
-                                            onClick={() => setSplitType('none')}
-                                            className="flex-1"
-                                        >
-                                            Don't Split
-                                        </Button>
+                                        )}
                                     </div>
 
-                                    {splitType === 'equal' && (
-                                        <div className="text-xs text-muted-foreground p-2 bg-muted/50 rounded-md">
-                                            Split equally between {members.length} people (${(parseFloat(expenseAmount || '0') / (members.length || 1)).toFixed(2)}/person)
+                                    {/* Split Type */}
+                                    <div>
+                                        <Label className="mb-2 block">Split</Label>
+                                        <div className="flex gap-2 mb-3">
+                                            <Button
+                                                type="button"
+                                                variant={splitType === 'equal' ? 'default' : 'outline'}
+                                                size="sm"
+                                                onClick={() => setSplitType('equal')}
+                                                className="flex-1"
+                                            >
+                                                Everyone
+                                            </Button>
+                                            <Button
+                                                type="button"
+                                                variant={splitType === 'specific' ? 'default' : 'outline'}
+                                                size="sm"
+                                                onClick={() => setSplitType('specific')}
+                                                className="flex-1"
+                                            >
+                                                Specific
+                                            </Button>
+                                            <Button
+                                                type="button"
+                                                variant={splitType === 'none' ? 'default' : 'outline'}
+                                                size="sm"
+                                                onClick={() => setSplitType('none')}
+                                                className="flex-1"
+                                            >
+                                                Don't Split
+                                            </Button>
                                         </div>
-                                    )}
 
-                                    {splitType === 'specific' && (
-                                        <div className="space-y-2 border rounded-md p-2 max-h-[200px] overflow-y-auto bg-muted/20">
-                                            {members.map(member => (
-                                                <div key={member.id} className="flex items-center gap-2">
-                                                    <Checkbox
-                                                        id={`split-${member.id}`}
-                                                        checked={selectedSplitUsers.includes(member.id)}
-                                                        onCheckedChange={(checked) => {
-                                                            if (checked) {
-                                                                setSelectedSplitUsers([...selectedSplitUsers, member.id]);
-                                                            } else {
-                                                                setSelectedSplitUsers(selectedSplitUsers.filter(id => id !== member.id));
-                                                            }
-                                                        }}
-                                                    />
-                                                    <Label htmlFor={`split-${member.id}`} className="flex items-center gap-2 cursor-pointer flex-1">
-                                                        <div className="h-5 w-5 rounded-full border bg-muted overflow-hidden shrink-0">
-                                                            <NotionAvatar className="h-full w-full" config={getAvatarConfig(member.image)} />
-                                                        </div>
-                                                        <span className="text-sm font-normal">{member.name || member.email}</span>
-                                                    </Label>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
+                                        {splitType === 'equal' && (
+                                            <div className="text-xs text-muted-foreground p-2 bg-muted/50 rounded-md">
+                                                Split equally between {members.length} people (${(parseFloat(expenseAmount || '0') / (members.length || 1)).toFixed(2)}/person)
+                                            </div>
+                                        )}
+
+                                        {splitType === 'specific' && (
+                                            <div className="space-y-2 border rounded-md p-2 max-h-[200px] overflow-y-auto bg-muted/20">
+                                                {members.map(member => (
+                                                    <div key={member.id} className="flex items-center gap-2">
+                                                        <Checkbox
+                                                            id={`split-${member.id}`}
+                                                            checked={selectedSplitUsers.includes(member.id)}
+                                                            onCheckedChange={(checked) => {
+                                                                if (checked) {
+                                                                    setSelectedSplitUsers([...selectedSplitUsers, member.id]);
+                                                                } else {
+                                                                    setSelectedSplitUsers(selectedSplitUsers.filter(id => id !== member.id));
+                                                                }
+                                                            }}
+                                                        />
+                                                        <Label htmlFor={`split-${member.id}`} className="flex items-center gap-2 cursor-pointer flex-1">
+                                                            <div className="h-5 w-5 rounded-full border bg-muted overflow-hidden shrink-0">
+                                                                <NotionAvatar className="h-full w-full" config={getAvatarConfig(member.image)} />
+                                                            </div>
+                                                            <span className="text-sm font-normal">{member.name || member.email}</span>
+                                                        </Label>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
-                            </div>
-                            <DialogFooter>
-                                <Button variant="outline" onClick={handleCloseDialog}>Cancel</Button>
-                                <Button onClick={handleSubmitExpense} disabled={isSubmitting}>
-                                    {editingTransactionId ? 'Update Expense' : 'Add Expense'}
-                                </Button>
-                            </DialogFooter>
-                        </DialogContent>
-                    </Dialog>
-                </div>
-            </DragDropContext>
+                                <DialogFooter>
+                                    <Button variant="outline" onClick={handleCloseDialog}>Cancel</Button>
+                                    <Button onClick={handleSubmitExpense} disabled={isSubmitting}>
+                                        {editingTransactionId ? 'Update Expense' : 'Add Expense'}
+                                    </Button>
+                                </DialogFooter>
+                            </DialogContent>
+                        </Dialog>
+                    </div>
+                </DragDropContext>
+            )}
         </div>
     );
 }
