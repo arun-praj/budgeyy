@@ -6,9 +6,12 @@ import * as schema from '@/db/schema';
 import { eq, desc, and, inArray, gt, sql, lte, or } from 'drizzle-orm';
 import { auth } from '@/lib/auth';
 import { headers } from 'next/headers';
-import { revalidatePath } from 'next/cache';
+import { revalidatePath, revalidateTag, cacheTag, cacheLife } from 'next/cache';
 import { v4 as uuidv4 } from 'uuid';
 import { sendEmail, emailTemplates } from '@/lib/mail';
+
+const getUserTripsTag = (userId: string) => `user-${userId}-trips`;
+const getTripTag = (tripId: string) => `trip-${tripId}`;
 
 /**
  * Ensures a user exists for the given email.
@@ -25,10 +28,7 @@ async function ensureShadowUser(email: string, name?: string, avatar?: string) {
     if (existingUser) return existingUser.id;
 
     // Create Shadow User
-    const newId = uuidv4(); // Use UUID for consistency with better-auth if possible, or nanoid. Schema says text. 
-    // better-auth usually generates random strings. Let's start with a random string.
-    // Actually schema definition is text('id').primaryKey().
-    // We will generate a UUID.
+    const newId = uuidv4();
 
     const [newUser] = await db.insert(schema.users).values({
         id: newId,
@@ -43,6 +43,31 @@ async function ensureShadowUser(email: string, name?: string, avatar?: string) {
     return newUser.id;
 }
 
+// --- Cached Internal Functions ---
+
+async function getCachedTripsInternal(userId: string, email: string) {
+    'use cache';
+    cacheTag(getUserTripsTag(userId));
+    cacheLife('minutes');
+
+    const userTrips = await db.query.trips.findMany({
+        where: and(
+            eq(trips.isArchived, false),
+            or(
+                eq(trips.userId, userId),
+                sql`EXISTS (
+                    SELECT 1 FROM trip_invites 
+                    WHERE trip_invites.trip_id = ${trips.id} 
+                    AND trip_invites.email = ${email}
+                )`
+            )
+        ),
+        orderBy: [desc(trips.createdAt)],
+    });
+
+    return userTrips;
+}
+
 export async function getTrips() {
     const session = await auth.api.getSession({
         headers: await headers()
@@ -52,26 +77,7 @@ export async function getTrips() {
         return [];
     }
 
-    const userTrips = await db.query.trips.findMany({
-        where: and(
-            eq(trips.isArchived, false),
-            or(
-                eq(trips.userId, session.user.id),
-                // Check if user ID exists in the invited list (requires a join or subquery normally, 
-                // but with Drizzle queries we can use 'exists' or just multiple queries if simpler.
-                // Actually, let's use the 'invites' relation if possible, or manual filter.
-                // A raw SQL exists query is most efficient here.
-                sql`EXISTS (
-                    SELECT 1 FROM trip_invites 
-                    WHERE trip_invites.trip_id = ${trips.id} 
-                    AND trip_invites.email = ${session.user.email}
-                )`
-            )
-        ),
-        orderBy: [desc(trips.createdAt)],
-    });
-
-    return userTrips;
+    return await getCachedTripsInternal(session.user.id, session.user.email);
 }
 
 export async function createTrip(data: {
@@ -102,12 +108,10 @@ export async function createTrip(data: {
         userId: session.user.id,
     }).returning({ id: trips.id });
 
-    // Handle invites (both new object format and legacy string array)
-    // Fix type inference by explicitly adding guestAvatar: undefined for legacy emails
+    // Handle invites
     const invitesToProcess = data.invites || (data.emails ? data.emails.map(e => ({ email: e, guestAvatar: undefined })) : []);
 
     if (invitesToProcess.length > 0) {
-        // 1. Create Invites Records (Keep for tracking status)
         await db.insert(schema.tripInvites).values(
             invitesToProcess.map(invite => ({
                 tripId: newTrip.id,
@@ -117,11 +121,9 @@ export async function createTrip(data: {
             }))
         );
 
-        // 2. Ensure Shadow Users for all invitees
         for (const invite of invitesToProcess) {
             await ensureShadowUser(invite.email, undefined, invite.guestAvatar);
 
-            // 3. Send invitation email
             const inviteLink = `${process.env.NEXT_PUBLIC_APP_URL}/splitlog/${newTrip.id}`;
             const unsubscribeUrl = `${process.env.NEXT_PUBLIC_APP_URL}/api/unsubscribe?email=${encodeURIComponent(invite.email)}`;
             const { subject, html, text } = emailTemplates.tripInvitation(
@@ -153,7 +155,7 @@ export async function createTrip(data: {
                 tripId: newTrip.id,
                 dayNumber: dayCount,
                 date: new Date(currentDate),
-                title: '', // Pending user input
+                title: '',
             });
             currentDate.setDate(currentDate.getDate() + 1);
             dayCount++;
@@ -163,7 +165,6 @@ export async function createTrip(data: {
             await db.insert(schema.tripItineraries).values(days);
         }
     } else if (data.startDate) {
-        // Single day trip if no end date
         await db.insert(schema.tripItineraries).values({
             tripId: newTrip.id,
             dayNumber: 1,
@@ -172,6 +173,7 @@ export async function createTrip(data: {
         });
     }
 
+    revalidateTag(getUserTripsTag(session.user.id), 'max');
     revalidatePath('/splitlog');
     return newTrip.id;
 }
@@ -197,6 +199,8 @@ export async function acceptTripInvite(tripId: string) {
             .set({ status: 'accepted' })
             .where(eq(tripInvites.id, invite.id));
 
+        revalidateTag(getUserTripsTag(session.user.id), 'max');
+        revalidateTag(getTripTag(tripId), 'max');
         revalidatePath(`/splitlog/${tripId}`);
         revalidatePath('/splitlog');
     }
@@ -233,6 +237,7 @@ export async function updateTripNotes(tripId: string, notes: string) {
         .set({ notes, updatedAt: new Date() })
         .where(eq(trips.id, tripId));
 
+    revalidateTag(getTripTag(tripId), 'max');
     revalidatePath(`/splitlog/${tripId}`);
 }
 
@@ -267,6 +272,7 @@ export async function updateTripDescription(tripId: string, description: string)
         .set({ description, updatedAt: new Date() })
         .where(eq(trips.id, tripId));
 
+    revalidateTag(getTripTag(tripId), 'max');
     revalidatePath(`/splitlog/${tripId}`);
 }
 
@@ -279,7 +285,6 @@ export async function deleteItineraryDay(itineraryId: string) {
         throw new Error('Unauthorized');
     }
 
-    // 1. Get the itinerary to find tripId and dayNumber
     const itinerary = await db.query.tripItineraries.findFirst({
         where: eq(schema.tripItineraries.id, itineraryId),
         with: {
@@ -297,17 +302,9 @@ export async function deleteItineraryDay(itineraryId: string) {
 
     const { tripId, dayNumber } = itinerary;
 
-    // 2. Delete the itinerary day
-    // Note: Child records (notes, transactions) should cascade delete if FKs are set up correctly, 
-    // but explicit delete is safer or we rely on schema. 
-    // Based on previous work, we might need to be explicit, but for now let's hope schema cascades or we can add explicit deletes if needed.
-    // Actually, simple DELETE is fine for now, user asked for functionality.
     await db.delete(schema.tripItineraries)
         .where(eq(schema.tripItineraries.id, itineraryId));
 
-    // 3. Shift subsequent days back by 1
-    // dayNumber -> dayNumber - 1
-    // date -> date - 1 day
     await db.update(schema.tripItineraries)
         .set({
             dayNumber: sql`${schema.tripItineraries.dayNumber} - 1`,
@@ -320,7 +317,6 @@ export async function deleteItineraryDay(itineraryId: string) {
             )
         );
 
-    // 4. Update Trip End Date (reduce by 1 day)
     if (itinerary.trip.endDate) {
         await db.update(trips)
             .set({
@@ -329,22 +325,19 @@ export async function deleteItineraryDay(itineraryId: string) {
             .where(eq(trips.id, tripId));
     }
 
+    revalidateTag(getTripTag(tripId), 'max');
     revalidatePath(`/splitlog/${tripId}`);
 }
 
-export async function getTrip(tripId: string) {
-    const session = await auth.api.getSession({
-        headers: await headers()
-    });
-
-    if (!session?.user) {
-        return null;
-    }
+async function getCachedTripInternal(tripId: string) {
+    'use cache';
+    cacheTag(getTripTag(tripId));
+    cacheLife('minutes');
 
     const trip = await db.query.trips.findFirst({
         where: eq(trips.id, tripId),
         with: {
-            user: true, // Fetch creator
+            user: true,
             itineraries: {
                 orderBy: (itineraries, { asc }) => [asc(itineraries.dayNumber)],
                 with: {
@@ -357,27 +350,26 @@ export async function getTrip(tripId: string) {
                                     user: true
                                 }
                             },
-                            payers: { // Fetch payers
+                            payers: {
                                 with: {
                                     user: true
                                 }
                             },
-                            user: true // Fetch transaction creator
+                            user: true
                         }
                     },
                     notes: {
                         with: {
-                            user: true // Fetch note creator
+                            user: true
                         }
                     },
                     checklists: {
                         with: {
-                            user: true // Fetch checklist creator
+                            user: true
                         }
                     },
                 }
             },
-            // Fetch all transactions for expense calculations
             tripTransactions: {
                 where: (utils, { eq }) => eq(utils.isDeleted, false),
                 orderBy: (transactions, { desc }) => [desc(transactions.date)],
@@ -400,25 +392,32 @@ export async function getTrip(tripId: string) {
                     user: true
                 }
             },
-            // Include invites
             invites: true,
         },
     });
 
+    return trip;
+}
+
+export async function getTrip(tripId: string) {
+    const session = await auth.api.getSession({
+        headers: await headers()
+    });
+
+    if (!session?.user) {
+        return null;
+    }
+
+    const trip = await getCachedTripInternal(tripId);
+
     if (!trip) return null;
 
-    // Basic authorization check: passed if user is creator
-    // TODO: Add check for invited users
+    // Authorization check
     if (trip.userId !== session.user.id) {
         // Check if user is invited
-        const invite = await db.query.tripInvites.findFirst({
-            where: (invites, { eq, and }) => and(
-                eq(invites.tripId, tripId),
-                eq(invites.email, session.user.email)
-            )
-        });
-
-        if (!invite) return null;
+        // We can check the `trip.invites` array which is already fetched
+        const isInvited = trip.invites.some(i => i.email === session.user.email);
+        if (!isInvited) return null;
     }
 
     return trip;
@@ -433,7 +432,6 @@ export async function deleteTrip(tripId: string) {
         throw new Error('Unauthorized');
     }
 
-    // 1. Verify trip exists and user is creator
     const trip = await db.query.trips.findFirst({
         where: eq(trips.id, tripId),
     });
@@ -446,11 +444,7 @@ export async function deleteTrip(tripId: string) {
         throw new Error('Only the trip creator can delete the trip');
     }
 
-    // 2. Perform deletion
-    // Depending on schema, we might need explicit cascading
-    // Let's be explicit for safety as seen in updateTripDates
     await db.transaction(async (tx) => {
-        // Get all itinerary IDs for this trip
         const itineraries = await tx.query.tripItineraries.findMany({
             where: eq(schema.tripItineraries.tripId, tripId),
             columns: { id: true }
@@ -458,31 +452,26 @@ export async function deleteTrip(tripId: string) {
         const itineraryIds = itineraries.map(i => i.id);
 
         if (itineraryIds.length > 0) {
-            // Delete related records for itineraries
             await tx.delete(schema.itineraryNotes)
                 .where(inArray(schema.itineraryNotes.tripItineraryId, itineraryIds));
             await tx.delete(schema.itineraryChecklists)
                 .where(inArray(schema.itineraryChecklists.tripItineraryId, itineraryIds));
-            // Multi-user expenses handles deletions via isDeleted usually, 
-            // but for a full trip delete we can wipe them or set isDeleted.
-            // Let's be consistent and delete them if we are wiping the trip.
             await tx.delete(schema.tripTransactions)
                 .where(inArray(schema.tripTransactions.tripItineraryId, itineraryIds));
         }
 
-        // Delete invites
         await tx.delete(schema.tripInvites)
             .where(eq(schema.tripInvites.tripId, tripId));
 
-        // Delete itineraries
         await tx.delete(schema.tripItineraries)
             .where(eq(schema.tripItineraries.tripId, tripId));
 
-        // Delete trip itself
         await tx.delete(trips)
             .where(eq(trips.id, tripId));
     });
 
+    revalidateTag(getUserTripsTag(session.user.id), 'max');
+    revalidateTag(getTripTag(tripId), 'max'); // Just in case, though it's gone
     revalidatePath('/splitlog');
     return { success: true };
 }
@@ -516,6 +505,8 @@ export async function archiveTrip(tripId: string) {
         })
         .where(eq(trips.id, tripId));
 
+    revalidateTag(getUserTripsTag(session.user.id), 'max');
+    revalidateTag(getTripTag(tripId), 'max');
     revalidatePath(`/splitlog/${tripId}`);
     return { success: true };
 }
@@ -548,10 +539,27 @@ export async function unarchiveTrip(tripId: string) {
         })
         .where(eq(trips.id, tripId));
 
+    revalidateTag(getUserTripsTag(session.user.id), 'max');
+    revalidateTag(getTripTag(tripId), 'max');
     revalidatePath('/splitlog');
-    // also revalidate profile/settings where this list might be shown
     revalidatePath('/settings');
     return { success: true };
+}
+
+async function getCachedArchivedTripsInternal(userId: string) {
+    'use cache';
+    cacheTag(getUserTripsTag(userId));
+    cacheLife('minutes');
+
+    const archivedTrips = await db.query.trips.findMany({
+        where: and(
+            eq(trips.userId, userId),
+            eq(trips.isArchived, true)
+        ),
+        orderBy: [desc(trips.archivedAt)],
+    });
+
+    return archivedTrips;
 }
 
 export async function getArchivedTrips() {
@@ -563,15 +571,7 @@ export async function getArchivedTrips() {
         return [];
     }
 
-    const archivedTrips = await db.query.trips.findMany({
-        where: and(
-            eq(trips.userId, session.user.id),
-            eq(trips.isArchived, true)
-        ),
-        orderBy: [desc(trips.archivedAt)],
-    });
-
-    return archivedTrips;
+    return await getCachedArchivedTripsInternal(session.user.id);
 }
 
 export async function updateItineraryDay(itineraryId: string, data: { title?: string; location?: string }) {
@@ -583,7 +583,12 @@ export async function updateItineraryDay(itineraryId: string, data: { title?: st
         throw new Error('Unauthorized');
     }
 
-    // TODO: Add strict ownership check here (verify user owns the trip linked to this itinerary)
+    // Fetch itinerary to get tripId for revalidation
+    const itinerary = await db.query.tripItineraries.findFirst({
+        where: eq(schema.tripItineraries.id, itineraryId),
+    });
+
+    if (!itinerary) throw new Error('Itinerary not found');
 
     await db.update(schema.tripItineraries)
         .set({
@@ -592,7 +597,8 @@ export async function updateItineraryDay(itineraryId: string, data: { title?: st
         })
         .where(eq(schema.tripItineraries.id, itineraryId));
 
-    revalidatePath('/splitlog/[tripId]'); // Revalidate the trip page
+    revalidateTag(getTripTag(itinerary.tripId), 'max');
+    revalidatePath('/splitlog/[tripId]');
 }
 
 export async function createItineraryNote(itineraryId: string, content: string, isHighPriority: boolean = false) {
@@ -602,13 +608,20 @@ export async function createItineraryNote(itineraryId: string, content: string, 
 
     if (!session?.user) throw new Error('Unauthorized');
 
+    // Fetch itinerary for tripId
+    const itinerary = await db.query.tripItineraries.findFirst({
+        where: eq(schema.tripItineraries.id, itineraryId),
+    });
+    if (!itinerary) throw new Error('Itinerary not found');
+
     const [note] = await db.insert(schema.itineraryNotes).values({
         tripItineraryId: itineraryId,
         content,
         isHighPriority,
-        userId: session.user.id, // Save userId
+        userId: session.user.id,
     }).returning();
 
+    revalidateTag(getTripTag(itinerary.tripId), 'max');
     revalidatePath('/splitlog/[tripId]');
     return note;
 }
@@ -620,7 +633,14 @@ export async function updateItineraryNote(noteId: string, content: string, isHig
 
     if (!session?.user) throw new Error('Unauthorized');
 
-    const [note] = await db.update(schema.itineraryNotes)
+    // Need tripId.
+    const note = await db.query.itineraryNotes.findFirst({
+        where: eq(schema.itineraryNotes.id, noteId),
+        with: { itinerary: true }
+    });
+    if (!note) throw new Error('Note not found');
+
+    const [updated] = await db.update(schema.itineraryNotes)
         .set({
             content,
             ...(isHighPriority !== undefined ? { isHighPriority } : {}),
@@ -629,8 +649,9 @@ export async function updateItineraryNote(noteId: string, content: string, isHig
         .where(eq(schema.itineraryNotes.id, noteId))
         .returning();
 
+    revalidateTag(getTripTag(note.itinerary.tripId), 'max');
     revalidatePath('/splitlog/[tripId]');
-    return note;
+    return updated;
 }
 
 export async function createItineraryChecklist(itineraryId: string, title: string) {
@@ -640,13 +661,19 @@ export async function createItineraryChecklist(itineraryId: string, title: strin
 
     if (!session?.user) throw new Error('Unauthorized');
 
+    const itinerary = await db.query.tripItineraries.findFirst({
+        where: eq(schema.tripItineraries.id, itineraryId),
+    });
+    if (!itinerary) throw new Error('Itinerary not found');
+
     await db.insert(schema.itineraryChecklists).values({
         tripItineraryId: itineraryId,
         title,
         items: '[]',
-        userId: session.user.id, // Save userId
+        userId: session.user.id,
     });
 
+    revalidateTag(getTripTag(itinerary.tripId), 'max');
     revalidatePath('/splitlog/[tripId]');
 }
 
@@ -657,6 +684,12 @@ export async function updateItineraryChecklist(checklistId: string, items: strin
 
     if (!session?.user) throw new Error('Unauthorized');
 
+    const checklist = await db.query.itineraryChecklists.findFirst({
+        where: eq(schema.itineraryChecklists.id, checklistId),
+        with: { itinerary: true }
+    });
+    if (!checklist) throw new Error('Checklist not found');
+
     await db.update(schema.itineraryChecklists)
         .set({
             items,
@@ -664,6 +697,7 @@ export async function updateItineraryChecklist(checklistId: string, items: strin
         })
         .where(eq(schema.itineraryChecklists.id, checklistId));
 
+    revalidateTag(getTripTag(checklist.itinerary.tripId), 'max');
     revalidatePath('/splitlog/[tripId]');
 }
 
@@ -674,9 +708,16 @@ export async function deleteItineraryNote(noteId: string) {
 
     if (!session?.user) throw new Error('Unauthorized');
 
+    const note = await db.query.itineraryNotes.findFirst({
+        where: eq(schema.itineraryNotes.id, noteId),
+        with: { itinerary: true }
+    });
+    if (!note) throw new Error('Note not found');
+
     await db.delete(schema.itineraryNotes)
         .where(eq(schema.itineraryNotes.id, noteId));
 
+    revalidateTag(getTripTag(note.itinerary.tripId), 'max');
     revalidatePath('/splitlog/[tripId]');
 }
 
@@ -687,9 +728,16 @@ export async function deleteItineraryChecklist(checklistId: string) {
 
     if (!session?.user) throw new Error('Unauthorized');
 
+    const checklist = await db.query.itineraryChecklists.findFirst({
+        where: eq(schema.itineraryChecklists.id, checklistId),
+        with: { itinerary: true }
+    });
+    if (!checklist) throw new Error('Checklist not found');
+
     await db.delete(schema.itineraryChecklists)
         .where(eq(schema.itineraryChecklists.id, checklistId));
 
+    revalidateTag(getTripTag(checklist.itinerary.tripId), 'max');
     revalidatePath('/splitlog/[tripId]');
 }
 
@@ -700,6 +748,32 @@ export async function deleteTripTransaction(transactionId: string) {
 
     if (!session?.user) throw new Error('Unauthorized');
 
+    const transaction = await db.query.tripTransactions.findFirst({
+        where: eq(schema.tripTransactions.id, transactionId),
+        with: { itinerary: true } // Relation name might vary, assuming 'itinerary' from schema usage above
+        // Actually schema use above uses `tripTransactions: { with: ... }`.
+        // I need to check if tripTransaction has `itinerary` relation defined in schema.
+        // db/schema.ts usually has `tripItinerary` relation.
+    });
+
+    // Fallback: If relation not available, fetch by ID. 
+    // We know it has `tripItineraryId` column.
+    // If we assume `tripItinerary` exists, we can use it to get tripId.
+    // Let's assume we can fetch itinerary by `tripItineraryId`.
+
+    // Better safeguard:
+    const tx = await db.query.tripTransactions.findFirst({
+        where: eq(schema.tripTransactions.id, transactionId),
+    });
+
+    if (!tx) throw new Error('Transaction not found');
+
+    const itinerary = await db.query.tripItineraries.findFirst({
+        where: eq(schema.tripItineraries.id, tx.tripItineraryId!)
+    });
+
+    if (!itinerary) throw new Error('Itinerary not found for transaction');
+
     await db.update(schema.tripTransactions)
         .set({
             isDeleted: true,
@@ -707,6 +781,7 @@ export async function deleteTripTransaction(transactionId: string) {
         })
         .where(eq(schema.tripTransactions.id, transactionId));
 
+    revalidateTag(getTripTag(itinerary.tripId), 'max');
     revalidatePath('/splitlog/[tripId]');
 }
 
@@ -721,8 +796,8 @@ export async function createTripTransaction(data: {
     isCredit?: boolean;
 
     splits?: { userId?: string; guestId?: string; amount: number }[];
-    paidByUserId?: string; // Legacy/Single user payer fallback
-    paidByGuestId?: string; // Single guest payer fallback
+    paidByUserId?: string;
+    paidByGuestId?: string;
     payers?: { userId?: string; guestId?: string; amount: number }[];
 }) {
     const session = await auth.api.getSession({
@@ -731,27 +806,23 @@ export async function createTripTransaction(data: {
 
     if (!session?.user?.id) throw new Error('Unauthorized');
 
-    // Determine payers: prioritize explicit payers array
     let finalPayers = data.payers || [];
 
-    // Fallback logic if payers array is empty
     if (finalPayers.length === 0) {
         if (data.paidByUserId) {
             finalPayers = [{ userId: data.paidByUserId, amount: data.amount }];
         } else {
-            // Default to creator if absolutely no info
             finalPayers = [{ userId: session.user.id, amount: data.amount }];
         }
     }
 
-    // Use transaction to ensure consistency
     const result = await db.transaction(async (tx) => {
         const [transaction] = await tx.insert(schema.tripTransactions).values({
             ...data,
             amount: data.amount.toString(),
             userId: session.user.id,
             paidByUserId: finalPayers[0]?.userId || null,
-            paidByGuestId: null, // No longer used
+            paidByGuestId: null,
         }).returning();
 
         if (data.splits && data.splits.length > 0) {
@@ -777,6 +848,7 @@ export async function createTripTransaction(data: {
         return transaction;
     });
 
+    revalidateTag(getTripTag(data.tripId), 'max');
     revalidatePath('/splitlog/[tripId]');
     return result;
 }
@@ -798,6 +870,19 @@ export async function updateTripTransaction(id: string, data: {
     });
 
     if (!session?.user?.id) throw new Error('Unauthorized');
+
+    // Get current transaction to find tripId
+    const currentTx = await db.query.tripTransactions.findFirst({
+        where: eq(schema.tripTransactions.id, id),
+    });
+    if (!currentTx) throw new Error('Transaction not found');
+
+    // Get tripId via itinerary
+    const itinerary = await db.query.tripItineraries.findFirst({
+        where: eq(schema.tripItineraries.id, currentTx.tripItineraryId!)
+    });
+
+    if (!itinerary) throw new Error('Itinerary not found');
 
     const result = await db.transaction(async (tx) => {
         // Prepare update data
@@ -850,7 +935,8 @@ export async function updateTripTransaction(id: string, data: {
         return transaction;
     });
 
-    revalidatePath('/splitlog/[tripId]');
+    revalidateTag(getTripTag(itinerary.tripId));
+    revalidatePath(`/splitlog/${itinerary.tripId}`);
     return result;
 }
 
@@ -1283,29 +1369,58 @@ export async function getPublicTrip(shareId: string) {
 
     if (!trip) return null;
 
-    // Fetch details for accepted invitees
-    const acceptedEmails = trip.invites
-        .filter(i => i.status === 'accepted')
-        .map(i => i.email);
+    // Fetch details for ALL invitees (accepted or pending)
+    // We want to display everyone so expenses can be mapped.
+    const invitedEmails = trip.invites.map(i => i.email.toLowerCase());
 
-    let acceptedUsers: any[] = [];
-    if (acceptedEmails.length > 0) {
-        acceptedUsers = await db.select({
+    const memberUsersMap = new Map<string, any>();
+
+    if (invitedEmails.length > 0) {
+        const invitedUsers = await db.select({
             id: users.id,
             name: users.name,
             email: users.email,
             image: users.image,
-            avatar: users.avatar
+            avatar: users.avatar,
+            isGuest: users.isGuest
         })
             .from(users)
-            .where(inArray(users.email, acceptedEmails));
+            .where(inArray(users.email, invitedEmails));
+
+        invitedUsers.forEach(u => memberUsersMap.set(u.email.toLowerCase(), u));
     }
 
-    // specific members array construction
-    const members = [
-        { ...trip.user, isGuest: false },
-        ...acceptedUsers.map(u => ({ ...u, isGuest: false }))
-    ];
+    // Construct valid member list (Creator + All Invitees)
+    const members: any[] = [{ ...trip.user, isGuest: false }];
+    const addedEmails = new Set<string>([trip.user.email.toLowerCase()]);
+
+    trip.invites.forEach(invite => {
+        const email = invite.email.toLowerCase();
+        if (addedEmails.has(email)) return;
+
+        const registeredUser = memberUsersMap.get(email);
+        if (registeredUser) {
+            // Include registered user (even if pending, as they might be a shadow user or real user)
+            // If they are a shadow user (isGuest=true), we respect that.
+            members.push({
+                ...registeredUser,
+                // Ensure image fallback logic matches page.tsx: Prefer avatar (JSON), fallback to image ONLY if it looks like JSON
+                image: registeredUser.avatar || (registeredUser.image && registeredUser.image.startsWith('{') ? registeredUser.image : null),
+                isGuest: registeredUser.isGuest || false
+            });
+            addedEmails.add(email);
+        } else {
+            // Fallback for purely virtual invite if no user record found (rare with ensureShadowUser)
+            members.push({
+                id: invite.id, // Use invite ID as temporary user ID
+                name: email.split('@')[0],
+                email: email,
+                image: invite.guestAvatar || null,
+                isGuest: true
+            });
+            addedEmails.add(email);
+        }
+    });
 
     return { trip, members };
 }

@@ -627,17 +627,12 @@ export function ItineraryTimeline({ items, categories = [], tripId, members = []
                                                                 (() => {
                                                                     // Helper to generator natural language description
                                                                     const t = unifiedItem.data;
-                                                                    const getMemberName = (id: string, isGuest: boolean = false) => {
-                                                                        const m = members.find(mem => mem.id === id);
-                                                                        return m ? (m.name || m.email.split('@')[0]) : 'Unknown';
-                                                                    };
 
                                                                     // 1. Payers
                                                                     let payerText = '';
                                                                     const payers = t.payers || [];
                                                                     if (payers.length > 0) {
                                                                         const names = payers.map((p: any) => p.user ? (p.user.name || p.user.email.split('@')[0]) : (p.paidByUser?.name || p.paidByUser?.email?.split('@')[0] || 'Unknown'));
-                                                                        // Fallback to old paidByUser if payers empty (legacy) or use logic
                                                                         if (names.length === 1) payerText = names[0];
                                                                         else if (names.length === 2) payerText = `${names[0]} and ${names[1]}`;
                                                                         else payerText = `${names[0]}, ${names[1]} & ${names.length - 2} others`;
@@ -647,34 +642,54 @@ export function ItineraryTimeline({ items, categories = [], tripId, members = []
                                                                         payerText = 'Unknown';
                                                                     }
 
-                                                                    // 2. Splits
-                                                                    let splitText = '';
-                                                                    const splits = t.splits || [];
-                                                                    if (splits.length > 0) {
-                                                                        // Check if equal check needed? For now just list names or "everyone"
-                                                                        // If split count == member count -> "everyone" (if simple enough)
-                                                                        // But user asked for "split by rosan, rodip... equally"
+                                                                    // 2. Splits Logic & Rendering
+                                                                    const renderSplitDescription = () => {
+                                                                        const splits = t.splits || [];
 
-                                                                        // Let's list names.
+                                                                        // Case: Did not split
+                                                                        if (splits.length === 0) {
+                                                                            return <span className="text-muted-foreground"> and did not split</span>;
+                                                                        }
+
                                                                         const splitNames = splits.map((s: any) => {
-                                                                            if (s.user) return s.user.name || s.user.email.split('@')[0];
-                                                                            // Handle guests if relations usually populated?
-                                                                            // The UnifiedItem might not have deep relations for splits->user if not eager loaded properly in previous getTrip
-                                                                            // But getTrip had: splits: { with: { user: true } }
                                                                             return s.user ? (s.user.name || s.user.email.split('@')[0]) : 'Unknown';
                                                                         });
 
-                                                                        if (splitNames.length === members.length) {
-                                                                            splitText = 'everyone';
-                                                                        } else {
-                                                                            if (splitNames.length === 1) splitText = splitNames[0];
-                                                                            else if (splitNames.length === 2) splitText = `${splitNames[0]} and ${splitNames[1]}`;
-                                                                            else if (splitNames.length === 3) splitText = `${splitNames[0]}, ${splitNames[1]} and ${splitNames[2]}`;
-                                                                            else splitText = `${splitNames[0]}, ${splitNames[1]} & ${splitNames.length - 2} others`;
+                                                                        // Case: Split by X only
+                                                                        if (splitNames.length === 1) {
+                                                                            return (
+                                                                                <>
+                                                                                    <span className="text-muted-foreground"> and split by </span>
+                                                                                    <span className="font-medium text-foreground">{splitNames[0]}</span>
+                                                                                    <span className="text-muted-foreground"> only</span>
+                                                                                </>
+                                                                            );
                                                                         }
-                                                                    } else {
-                                                                        splitText = 'everyone'; // Default if no explicit splits? Or 'pending'?
-                                                                    }
+
+                                                                        // Case: Split by everyone
+                                                                        if (splitNames.length === members.length) {
+                                                                            return (
+                                                                                <>
+                                                                                    <span className="text-muted-foreground"> and split by </span>
+                                                                                    <span className="font-medium text-foreground">everyone</span>
+                                                                                    <span className="text-muted-foreground"> equally</span>
+                                                                                </>
+                                                                            );
+                                                                        }
+
+                                                                        // Case: Specific subset
+                                                                        const namesStr = splitNames.length === 2
+                                                                            ? `${splitNames[0]} and ${splitNames[1]}`
+                                                                            : `${splitNames.slice(0, -1).join(', ')} and ${splitNames[splitNames.length - 1]}`;
+
+                                                                        return (
+                                                                            <>
+                                                                                <span className="text-muted-foreground"> and split by </span>
+                                                                                <span className="font-medium text-foreground">{namesStr}</span>
+                                                                                <span className="text-muted-foreground"> equally</span>
+                                                                            </>
+                                                                        );
+                                                                    };
 
                                                                     // 3. Time
                                                                     const timeText = t.date ? format(new Date(t.date), 'h:mm a') : '';
@@ -695,12 +710,10 @@ export function ItineraryTimeline({ items, categories = [], tripId, members = []
                                                                                     <div className="font-normal text-foreground/90 leading-relaxed">
                                                                                         <span className="font-semibold text-foreground">{payerText}</span>
                                                                                         <span className="text-muted-foreground"> paid </span>
-                                                                                        <span className="font-bold text-emerald-600 dark:text-emerald-400">{userCurrency} {t.amount}</span>
+                                                                                        <span className="font-bold text-emerald-600 dark:text-emerald-400">{userCurrency} {parseFloat(t.amount).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
                                                                                         <span className="text-muted-foreground"> for </span>
                                                                                         <span className="font-medium text-foreground">{t.description || 'Expense'}</span>
-                                                                                        <span className="text-muted-foreground"> and split by </span>
-                                                                                        <span className="font-medium text-foreground">{splitText}</span>
-                                                                                        <span className="text-muted-foreground"> equally</span>
+                                                                                        {renderSplitDescription()}
                                                                                         {timeText && (
                                                                                             <span className="text-muted-foreground/60 text-xs ml-1">
                                                                                                 at {timeText}
