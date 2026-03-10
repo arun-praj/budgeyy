@@ -65,7 +65,7 @@ export async function classifyEmail(subject: string, sender: string, snippet: st
 
     try {
         const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash-lite',
+            model: 'gemini-3-flash-preview',
             contents: prompt,
             config: {
                 responseMimeType: 'application/json',
@@ -141,7 +141,7 @@ export async function generateMonthlyInsight(
 
     try {
         const response = await ai.models.generateContent({
-            model: 'gemini-2.0-flash-exp', // Fast model for insights
+            model: 'gemini-3-flash-preview', // Fast model for insights
             contents: prompt,
         });
 
