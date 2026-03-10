@@ -481,6 +481,22 @@ export const scannedEmails = pgTable('scanned_emails', {
     createdAt: timestamp('created_at').notNull().defaultNow(),
 });
 
+// AI Insights Table
+export const aiInsights = pgTable('ai_insights', {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    insight: text('insight').notNull(),
+    type: text('type').notNull().default('monthly_summary'),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+
+export const aiInsightsRelations = relations(aiInsights, ({ one }) => ({
+    user: one(users, {
+        fields: [aiInsights.userId],
+        references: [users.id],
+    }),
+}));
+
 export const scannedEmailsRelations = relations(scannedEmails, ({ one }) => ({
     user: one(users, {
         fields: [scannedEmails.userId],
