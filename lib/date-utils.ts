@@ -119,19 +119,18 @@ export function toUTCString(date: Date | string): string {
  * Handles both Gregorian and Nepali calendars
  */
 export function getMonthRange(date: Date, calendar: CalendarSystem = 'gregorian'): { start: Date; end: Date } {
+    const d = new Date(date);
+    
     if (calendar === 'nepali') {
         try {
-            // Get the Nepali date for the input
-            const nd = new NepaliDate(date);
+            const nd = new NepaliDate(d);
             const year = nd.getYear();
             const month = nd.getMonth();
 
-            // Start of month: 1st day of current Nepali month
             const startNd = new NepaliDate(year, month, 1);
             const start = startNd.toJsDate();
             start.setHours(0, 0, 0, 0);
 
-            // End of month: 0th day of next month (which gives last day of current month)
             const endNd = new NepaliDate(year, month + 1, 0);
             const end = endNd.toJsDate();
             end.setHours(23, 59, 59, 999);
@@ -139,12 +138,10 @@ export function getMonthRange(date: Date, calendar: CalendarSystem = 'gregorian'
             return { start, end };
         } catch (e) {
             console.error('Error calculating Nepali month range', e);
-            // Fallback to Gregorian
         }
     }
 
-    const d = new Date(date);
-    const start = new Date(d.getFullYear(), d.getMonth(), 1);
+    const start = new Date(d.getFullYear(), d.getMonth(), 1, 0, 0, 0, 0);
     const end = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999);
     return { start, end };
 }

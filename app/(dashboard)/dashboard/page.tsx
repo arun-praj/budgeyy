@@ -126,16 +126,88 @@ async function DashboardContent({ searchParams }: { searchParams: Promise<{ [key
     const { start, end } = getMonthRange(currentDate, calendar);
 
     // Run fetches in parallel
-    const [stats, recentTransactions, dailyStats] = await Promise.all([
+    const [stats, recentTransactions, dailyStats, reportData] = await Promise.all([
         getDashboardStats({ start, end }),
         getTransactions({ limit: 5, start, end }),
         getCalendarStats(start, end),
+        getBudgetReportData(start, end),
     ]);
     // Net Savings = Explicit Savings Transaction Amount Only
     const netSavings = stats.savingsAmount;
     // Balance = Income - Expenses - Savings (Remaining spendable)
     const balance = stats.totalIncome - stats.totalExpenses - netSavings;
     const formattedMonth = formatPeriodLabel(currentDate, calendar);
+
+    // Prepare DIRECT 2-COLUMN Sankey Data: Income -> Destinations
+    const sankeyData = {
+        nodes: [] as { name: string }[],
+        links: [] as { source: number; target: number; value: number }[],
+    };
+
+    if (reportData && stats.totalIncome > 0) {
+        const nodeMap = new Map<string, number>();
+        const getOrCreateNode = (name: string) => {
+            const key = name.trim();
+            if (nodeMap.has(key)) return nodeMap.get(key)!;
+            const index = sankeyData.nodes.length;
+            sankeyData.nodes.push({ name: key });
+            nodeMap.set(key, index);
+            return index;
+        };
+
+        // 1. Collect all income sources (Left side)
+        const incomeSources = reportData.income
+            .filter(inc => Number(inc.amount) > 0)
+            .map(inc => ({
+                name: inc.description || 'Other Income',
+                amount: Math.round((Number(inc.amount) || 0) * 100) / 100,
+                remaining: Math.round((Number(inc.amount) || 0) * 100) / 100
+            }));
+
+        // 2. Collect all destinations (Right side)
+        const destinations: { name: string, needed: number }[] = [];
+        [...reportData.needs, ...reportData.wants].forEach(cat => {
+            const val = Math.round((Number(cat.amount) || 0) * 100) / 100;
+            if (val > 0) destinations.push({ name: cat.description, needed: val });
+        });
+
+        if (stats.savingsAmount > 0) {
+            destinations.push({ name: 'Savings 🐖', needed: Math.round(stats.savingsAmount * 100) / 100 });
+        }
+
+        const totalIncome = Math.round(stats.totalIncome * 100) / 100;
+        const totalOutflow = destinations.reduce((acc, d) => acc + d.needed, 0);
+        
+        if (totalIncome > totalOutflow) {
+            destinations.push({ name: 'Unspent Balance', needed: Math.round((totalIncome - totalOutflow) * 100) / 100 });
+        }
+
+        // 3. Map Sources to Destinations directly (Greedy distribution)
+        let sourceIdx = 0;
+        let sinkIdx = 0;
+
+        while (sourceIdx < incomeSources.length && sinkIdx < destinations.length) {
+            const source = incomeSources[sourceIdx];
+            const sink = destinations[sinkIdx];
+            const amountToFlow = Math.min(source.remaining, sink.needed);
+
+            if (amountToFlow > 0.009) {
+                const sNodeIdx = getOrCreateNode(source.name);
+                const dNodeIdx = getOrCreateNode(sink.name);
+                sankeyData.links.push({
+                    source: sNodeIdx,
+                    target: dNodeIdx,
+                    value: amountToFlow
+                });
+            }
+
+            source.remaining -= amountToFlow;
+            sink.needed -= amountToFlow;
+
+            if (source.remaining < 0.01) sourceIdx++;
+            if (sink.needed < 0.01) sinkIdx++;
+        }
+    }
 
 
     return (

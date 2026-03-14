@@ -233,18 +233,14 @@ async function getCachedDashboardStatsInternal(userId: string, startStr: string,
         } else if (tx.type === 'savings') {
             stats.savingsAmount += amount;
         } else {
-            if (!tx.isCredit) {
-                stats.totalExpenses += amount;
-                switch (tx.necessityLevel) {
-                    case 'needs':
-                        stats.needsSpent += amount;
-                        break;
-                    case 'wants':
-                        stats.wantsSpent += amount;
-                        break;
-                    case 'savings':
-                        break;
-                }
+            // Include ALL expenses in total expenses, including credit
+            // The isCredit flag is for cash flow timing, but it's still an expense incurred.
+            stats.totalExpenses += amount;
+            
+            if (tx.necessityLevel === 'needs') {
+                stats.needsSpent += amount;
+            } else if (tx.necessityLevel === 'wants') {
+                stats.wantsSpent += amount;
             }
         }
     }
